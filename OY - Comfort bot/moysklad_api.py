@@ -156,6 +156,29 @@ async def update_counterparty_address(counterparty_id: str, address: str) -> dic
     return await _put(url, json_data={"actualAddress": address})
 
 
+async def reverse_geocode(lat: float, lon: float) -> str:
+    """Convert GPS coordinates to a human-readable address via Nominatim.
+
+    Falls back to plain coordinates if the request fails.
+    """
+    url = "https://nominatim.openstreetmap.org/reverse"
+    params = {"lat": lat, "lon": lon, "format": "json", "accept-language": "uz,ru,en"}
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(8.0),
+            headers={"User-Agent": "ComfortTextileBot/1.0"},
+        ) as client:
+            resp = await client.get(url, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+            display = (data.get("display_name") or "").strip()
+            if display:
+                return display
+    except Exception as e:
+        logger.warning("reverse_geocode failed (%.6f, %.6f): %s", lat, lon, e)
+    return f"{lat:.6f}, {lon:.6f}"
+
+
 async def fetch_entity(href: str) -> dict:
     """Fetch any MoySklad entity by its full href URL."""
     params = {

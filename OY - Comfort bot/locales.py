@@ -355,8 +355,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "📍 Мой адрес",
     },
     "ask_address": {
-        "uz": "📍 Yetkazib berish manzilingizni kiriting:\n(Shahar, ko'cha, uy raqami)",
-        "ru": "📍 Введите ваш адрес доставки:\n(Город, улица, номер дома)",
+        "uz": "📍 Yetkazib berish manzilingizni yuboring:\nGPS tugmasini bosing yoki qo'lda kiriting (Shahar, ko'cha, uy raqami)",
+        "ru": "📍 Отправьте адрес доставки:\nНажмите кнопку GPS или введите вручную (Город, улица, дом)",
+    },
+    "share_location_btn": {
+        "uz": "📍 GPS joylashuvni yuborish",
+        "ru": "📍 Отправить геолокацию",
     },
     "skip_address_btn": {
         "uz": "⏭ O'tkazib yuborish",

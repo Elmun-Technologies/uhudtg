@@ -24,6 +24,7 @@ from moysklad_api import (
     fetch_salesreturns_for_counterparty,
     update_counterparty_address,
     sync_counterparty,
+    reverse_geocode,
 )
 from time_utils import local_today
 from formatting import doc_number_for_template, fmt_quantity, fmt_usd
@@ -711,23 +712,32 @@ async def handle_address_menu(message: Message, state: FSMContext) -> None:
     await message.answer(t("ask_address", lang), reply_markup=skip_kb(lang))
 
 
+@router.message(AddrStates.waiting_address, F.location)
+async def handle_address_location(message: Message, state: FSMContext) -> None:
+    user = await db.get_user(message.from_user.id)
+    lang = (user.get("language") or "uz") if user else "uz"
+    await state.clear()
+    address = await reverse_geocode(message.location.latitude, message.location.longitude)
+    await _apply_address_update(message, user, lang, address)
+
+
 @router.message(AddrStates.waiting_address)
 async def handle_address_update(message: Message, state: FSMContext) -> None:
     user = await db.get_user(message.from_user.id)
     lang = (user.get("language") or "uz") if user else "uz"
     address = (message.text or "").strip()
-
     await state.clear()
-
     if not address or address in SKIP_ADDRESS_TEXTS:
         await message.answer(t("main_menu", lang), reply_markup=main_menu_kb(lang))
         return
+    await _apply_address_update(message, user, lang, address)
 
+
+async def _apply_address_update(message: Message, user: dict | None, lang: str, address: str) -> None:
     cp_id = user.get("moysklad_counterparty_id") if user else None
     if not cp_id:
         await message.answer(t("main_menu", lang), reply_markup=main_menu_kb(lang))
         return
-
     try:
         await update_counterparty_address(cp_id, address)
         await message.answer(t("address_updated", lang), reply_markup=main_menu_kb(lang))
