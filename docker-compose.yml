@@ -7,10 +7,10 @@ services:
     dns:
       - 8.8.8.8
       - 1.1.1.1
-    # Port WEBHOOK_HOST_PORT (.env da belgilangan, masalan 8081).
-    # Mavjud Traefik yoki nginx orqali routing qilinadi.
+    # Bot ichkarida WEBHOOK_PORT portida tinglaydi.
+    # Xost portini WEBHOOK_HOST_PORT o'zgaruvchisi bilan belgilang.
     ports:
-      - target: 8080
+      - target: ${WEBHOOK_PORT:-8080}
         published: "${WEBHOOK_HOST_PORT:-}"
         protocol: tcp
     volumes:
