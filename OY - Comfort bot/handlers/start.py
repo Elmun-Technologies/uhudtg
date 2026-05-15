@@ -4,7 +4,7 @@ from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Contact, Message
+from aiogram.types import Contact, Location, Message
 
 import logging
 import database as db
@@ -126,20 +126,32 @@ async def handle_phone_text(message: Message, state: FSMContext) -> None:
     await _finish_registration(message, state, is_new)
 
 
+@router.message(RegStates.waiting_address, F.location)
+async def handle_reg_address_location(message: Message, state: FSMContext) -> None:
+    """Address step during registration: user shared GPS location."""
+    loc: Location = message.location
+    address = await moysklad_api.reverse_geocode(loc.latitude, loc.longitude)
+    await _save_reg_address(message.from_user.id, address)
+    await state.clear()
+    await message.answer(t("registered_success", "uz"), reply_markup=main_menu_kb("uz"))
+
+
 @router.message(RegStates.waiting_address)
 async def handle_reg_address(message: Message, state: FSMContext) -> None:
     """Address step during registration: save or skip."""
     address = (message.text or "").strip()
     skip_text = t("skip_address_btn", "uz")
-
     if address and address != skip_text:
-        user = await db.get_user(message.from_user.id)
-        cp_id = user.get("moysklad_counterparty_id") if user else None
-        if cp_id:
-            try:
-                await moysklad_api.update_counterparty_address(cp_id, address)
-            except Exception as e:
-                logger.error("Error saving address during registration for user %s: %s", message.from_user.id, e)
-
+        await _save_reg_address(message.from_user.id, address)
     await state.clear()
     await message.answer(t("registered_success", "uz"), reply_markup=main_menu_kb("uz"))
+
+
+async def _save_reg_address(telegram_id: int, address: str) -> None:
+    user = await db.get_user(telegram_id)
+    cp_id = user.get("moysklad_counterparty_id") if user else None
+    if cp_id:
+        try:
+            await moysklad_api.update_counterparty_address(cp_id, address)
+        except Exception as e:
+            logger.error("Error saving address during registration for user %s: %s", telegram_id, e)
