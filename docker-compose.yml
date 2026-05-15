@@ -4,46 +4,22 @@ services:
       context: "./OY - Comfort bot"
     restart: unless-stopped
     env_file: .env
-    # Явные публичные DNS — на случай, если хост-резолвер недоступен из
-    # дефолтной docker-сети. Без этого исходящие запросы к
-    # api.moysklad.ru / api.telegram.org могут падать с
-    # "[Errno -5] No address associated with hostname".
     dns:
       - 8.8.8.8
       - 1.1.1.1
-    # WEBHOOK_HOST_PORT (ixtiyoriy, .env orqali):
-    #   bo'sh/ko'rsatilmagan → port tashqariga ochilmaydi; Caddy HTTPS orqali ishlaydi
-    #   8080 → MoySklad webhooklari to'g'ridan-to'g'ri http://<ip>:8080 ga keladi
-    #   8181 → agar 8080 band bo'lsa, boshqa port
+    # Faqat localhost ga ochiladi — mavjud nginx/caddy orqali proxy qilinadi.
+    # WEBHOOK_HOST_PORT ni .env da o'zgartiring (default: 8082).
+    # Boshqa loyihada 8082 band bo'lsa boshqa port tanlang (masalan 8083).
     ports:
-      - target: 8080
-        published: "${WEBHOOK_HOST_PORT:-}"
-        protocol: tcp
+      - "127.0.0.1:${WEBHOOK_HOST_PORT:-8082}:8080"
     volumes:
-      - bot_data:/data
+      - comfort_bot_data:/data
       - ./assets:/app/assets
     networks:
-      - app
-
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    env_file: .env
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      - app
+      - comfort_bot_net
 
 volumes:
-  bot_data:
-  caddy_data:
-  caddy_config:
+  comfort_bot_data:
 
 networks:
-  app:
+  comfort_bot_net:
