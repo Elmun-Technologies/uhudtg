@@ -39,7 +39,11 @@ async def run_daily_report_loop(bot) -> None:
         try:
             await daily_report.run_for_today(bot)
         except Exception as e:
-            logger.exception("daily_report run failed: %s", e)
+            logger.exception("daily_report admin run failed: %s", e)
+        try:
+            await daily_report.run_customer_reports(bot)
+        except Exception as e:
+            logger.exception("daily_report customer run failed: %s", e)
         # на случай если отчёт отработал быстрее минуты — подождём,
         # чтобы не уйти на повторный запуск в ту же минуту
         await asyncio.sleep(61)

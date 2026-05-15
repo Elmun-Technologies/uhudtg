@@ -285,6 +285,19 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
     },
 
+    "daily_customer_report": {
+        "uz": (
+            "📊 Kunlik hisobot: {date}\n\n"
+            "📦 Bugungi otgruzkalar: {ship_count} ta — ${ship_total}\n\n"
+            "💰 Joriy balans: ${balance} USD"
+        ),
+        "ru": (
+            "📊 Отчёт за день: {date}\n\n"
+            "📦 Отгрузки за сегодня: {ship_count} шт. — ${ship_total}\n\n"
+            "💰 Текущий баланс: ${balance} USD"
+        ),
+    },
+
     "daily_admin_report": {
         "ru": (
             "📊 Отчёт: Сегодня, {date}\n\n"

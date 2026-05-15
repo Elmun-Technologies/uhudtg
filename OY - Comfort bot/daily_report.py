@@ -1,8 +1,11 @@
-"""Дневной отчёт для админов: агрегирует МойСклад + локальную БД и шлёт в TG.
+"""Дневной отчёт для админов + персональные отчёты клиентам.
 
 Запускается по расписанию (см. scheduler.py) каждый день в 20:00 Asia/Tashkent.
 Период отчёта — 00:00:00–23:59:59 текущего дня в Asia/Tashkent (МойСклад
 фильтр конвертируется в МСК — Europe/Moscow).
+
+Клиентские отчёты отправляются только пользователям у которых были
+отгрузки (demand) сегодня и есть привязка к контрагенту в МойСклад.
 """
 from __future__ import annotations
 
@@ -122,3 +125,67 @@ async def run_for_today(bot) -> None:
         except Exception as e:
             logger.error("daily_report: send to %s failed: %s", admin_id, e)
     logger.info("daily_report: sent to %d admin(s)", len(ADMIN_IDS))
+
+
+async def run_customer_reports(bot) -> None:
+    """Bugungi otgruzkasi bo'lgan har bir mijozga shaxsiy kunlik hisobot yuborish.
+
+    Faqat moysklad_counterparty_id bor va bugun demand (otgruzka) bo'lgan
+    foydalanuvchilarga yuboriladi.
+    """
+    today = local_today()
+    moment_lo = f"{today.isoformat()} 00:00:00"
+    moment_hi = f"{today.isoformat()} 23:59:59"
+    date_label = today.strftime("%d.%m.%Y")
+
+    try:
+        users = await db.get_all_users()
+    except Exception as e:
+        logger.exception("customer_report: get_all_users failed: %s", e)
+        return
+
+    sent_count = 0
+    for user in users:
+        cp_id = user.get("moysklad_counterparty_id")
+        if not cp_id:
+            continue
+        telegram_id = user["telegram_id"]
+        lang = user.get("language") or "uz"
+
+        try:
+            shipments = await ms.fetch_demands_for_counterparty(
+                cp_id,
+                moment_lo=moment_lo,
+                moment_hi=moment_hi,
+                result_limit=None,
+                max_api_scan=500,
+            )
+        except Exception as e:
+            logger.error("customer_report: demands fetch failed user=%s: %s", telegram_id, e)
+            continue
+
+        if not shipments:
+            continue
+
+        ship_count = len(shipments)
+        ship_total = sum(s["total_usd"] for s in shipments)
+
+        try:
+            balance = await ms.fetch_counterparty_balance(cp_id)
+        except Exception:
+            balance = float(user.get("balance_usd") or 0.0)
+
+        try:
+            text = t(
+                "daily_customer_report", lang,
+                date=date_label,
+                ship_count=ship_count,
+                ship_total=_fmt_money_ru(ship_total),
+                balance=_fmt_money_ru(balance),
+            )
+            await bot.send_message(telegram_id, text)
+            sent_count += 1
+        except Exception as e:
+            logger.error("customer_report: send failed user=%s: %s", telegram_id, e)
+
+    logger.info("customer_report: sent to %d customer(s)", sent_count)

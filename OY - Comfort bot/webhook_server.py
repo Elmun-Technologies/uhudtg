@@ -138,18 +138,36 @@ async def _process_order(href: str) -> None:
     raw   = await ms.fetch_entity(href)
     order = ms.parse_order(raw)
 
-    user       = await db.get_user_by_phone(order["agent_phone"])
+    user        = await db.get_user_by_phone(order["agent_phone"])
     telegram_id = user["telegram_id"] if user else None
+    lang        = user["language"]    if user else "uz"
     balance = float(user["balance_usd"]) if user and user.get("balance_usd") is not None else 0.0
 
     if telegram_id and order["agent_id"]:
         await db.save_moysklad_counterparty_id(telegram_id, order["agent_id"])
 
-    logger.info(
-        "Order %s (MoySklad only, DB history not stored), phone=%s",
-        order["order_number"],
-        order["agent_phone"],
+    if not telegram_id or not _bot:
+        logger.info(
+            "Order %s: no TG user for phone %s",
+            order["order_number"],
+            order["agent_phone"],
+        )
+        return
+
+    from locales import t
+    date_str = fmt_datetime_display(order["moment"])
+    text = t(
+        "order_notification", lang,
+        number=escape(doc_number_for_template(order["order_number"])),
+        date=escape(date_str),
+        name=escape(order["agent_name"] or ""),
+        phone=escape(order["agent_phone"] or ""),
+        items=_format_items(order["items"], lang),
+        total=fmt_usd(order["total_usd"]),
+        balance=fmt_usd(balance),
     )
+    await _bot.send_message(telegram_id, text)
+    logger.info("Order notification → user %s, order %s", telegram_id, order["order_number"])
 
 
 async def _process_shipment(href: str) -> None:
