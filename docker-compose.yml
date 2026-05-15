@@ -7,20 +7,25 @@ services:
     dns:
       - 8.8.8.8
       - 1.1.1.1
-    # Bot ichkarida WEBHOOK_PORT portida tinglaydi.
-    # Xost portini WEBHOOK_HOST_PORT o'zgaruvchisi bilan belgilang.
-    ports:
-      - target: ${WEBHOOK_PORT:-8080}
-        published: "${WEBHOOK_HOST_PORT:-}"
-        protocol: tcp
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.comfort-bot.rule=Host(`167-172-180-173.sslip.io`) && PathPrefix(`/moysklad`)"
+      - "traefik.http.routers.comfort-bot.entrypoints=websecure"
+      - "traefik.http.routers.comfort-bot.tls=true"
+      - "traefik.http.routers.comfort-bot.tls.certresolver=letsencrypt"
+      - "traefik.http.services.comfort-bot.loadbalancer.server.port=${WEBHOOK_PORT:-8080}"
+      - "traefik.docker.network=dokploy-network"
     volumes:
-      - bot_data:/data          # nom o'zgartirilmadi — mavjud DB saqlanadi
+      - bot_data:/data          # mavjud DB saqlanadi
       - ./assets:/app/assets
     networks:
       - comfort_bot_net
+      - dokploy-network
 
 volumes:
   bot_data:
 
 networks:
   comfort_bot_net:
+  dokploy-network:
+    external: true
