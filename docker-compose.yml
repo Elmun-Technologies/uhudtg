@@ -1,0 +1,47 @@
+services:
+  bot:
+    build:
+      context: "./OY - Comfort bot"
+    restart: unless-stopped
+    env_file: .env
+    # Явные публичные DNS — на случай, если хост-резолвер недоступен из
+    # дефолтной docker-сети. Без этого исходящие запросы к
+    # api.moysklad.ru / api.telegram.org могут падать с
+    # "[Errno -5] No address associated with hostname".
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    # Публикуем порт вебхук-сервера наружу, чтобы МойСклад мог
+    # доставлять вебхуки прямо на хост (http://<server-ip>:8080).
+    # Если в будущем появится домен и Caddy сможет получить
+    # SSL-сертификат — этот порт можно закрыть и слать через :443.
+    ports:
+      - "8080:8080"
+    volumes:
+      - bot_data:/data
+      - ./assets:/app/assets
+    networks:
+      - app
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - app
+
+volumes:
+  bot_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  app:

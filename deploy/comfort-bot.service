@@ -1,0 +1,24 @@
+[Unit]
+Description=Comfort Textile Telegram Bot
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=comfortbot
+Group=comfortbot
+WorkingDirectory=/opt/comfort-bot
+ExecStart=/opt/comfort-bot/venv/bin/python bot.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=comfort-bot
+EnvironmentFile=/opt/comfort-bot/.env
+
+# Hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

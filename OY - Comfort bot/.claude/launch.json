@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Comfort Bot (Telegram + Webhook)",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["bot.py"],
+      "port": 8080
+    },
+    {
+      "name": "Sync Balances (one-time)",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["sync_balances.py"],
+      "port": 0
+    }
+  ]
+}
