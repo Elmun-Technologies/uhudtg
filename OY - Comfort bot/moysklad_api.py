@@ -1000,7 +1000,7 @@ async def aggregate_documents(
     total_default = 0.0
     sample_logged = False
     while True:
-        params = {"filter": flt, "limit": page, "offset": offset, "order": "moment,asc"}
+        params = {"filter": flt, "limit": page, "offset": offset, "order": "moment,asc", "expand": "rate.currency"}
         try:
             data = await _get(url, params=params)
         except Exception as e:

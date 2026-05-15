@@ -76,6 +76,8 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
     if user:
         lang = user["language"]
         await message.answer(t("already_registered", lang))
+        if not user.get("moysklad_counterparty_id"):
+            await message.answer(t("no_counterparty_for_list", lang))
         await message.answer(t("main_menu", lang), reply_markup=main_menu_kb(lang))
         return
 
@@ -149,7 +151,18 @@ async def handle_reg_address(message: Message, state: FSMContext) -> None:
 
 async def _save_reg_address(telegram_id: int, address: str) -> None:
     user = await db.get_user(telegram_id)
-    cp_id = user.get("moysklad_counterparty_id") if user else None
+    if not user:
+        return
+    cp_id = user.get("moysklad_counterparty_id")
+    if not cp_id:
+        phone = (user.get("phone") or "").strip()
+        if phone:
+            try:
+                cp_id = await moysklad_api.find_counterparty_id_by_phone(phone)
+                if cp_id:
+                    await db.save_moysklad_counterparty_id(telegram_id, cp_id)
+            except Exception as e:
+                logger.warning("_save_reg_address: counterparty lookup failed user=%s: %s", telegram_id, e)
     if cp_id:
         try:
             await moysklad_api.update_counterparty_address(cp_id, address)

@@ -735,8 +735,11 @@ async def handle_address_update(message: Message, state: FSMContext) -> None:
 
 async def _apply_address_update(message: Message, user: dict | None, lang: str, address: str) -> None:
     cp_id = user.get("moysklad_counterparty_id") if user else None
+    if not cp_id and user:
+        # Kontragent DB da yo'q — telefon orqali MoySkladdan topishga urinib ko'ramiz
+        cp_id = await _resolve_counterparty_id(user)
     if not cp_id:
-        await message.answer(t("main_menu", lang), reply_markup=main_menu_kb(lang))
+        await message.answer(t("no_counterparty_for_list", lang), reply_markup=main_menu_kb(lang))
         return
     try:
         await update_counterparty_address(cp_id, address)

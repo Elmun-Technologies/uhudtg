@@ -119,12 +119,21 @@ async def run_for_today(bot) -> None:
     except Exception as e:
         logger.exception("daily_report: build failed: %s", e)
         return
+    sent = 0
     for admin_id in ADMIN_IDS:
+        registered = await db.get_user(admin_id)
+        if not registered:
+            logger.warning(
+                "daily_report: admin_id=%s is not registered in the bot — "
+                "remove from ADMIN_IDS or ask them to /start first",
+                admin_id,
+            )
         try:
             await bot.send_message(admin_id, text)
+            sent += 1
         except Exception as e:
             logger.error("daily_report: send to %s failed: %s", admin_id, e)
-    logger.info("daily_report: sent to %d admin(s)", len(ADMIN_IDS))
+    logger.info("daily_report: sent to %d/%d admin(s)", sent, len(ADMIN_IDS))
 
 
 async def run_customer_reports(bot) -> None:
