@@ -8,7 +8,7 @@ from aiogram.types import Contact, Message
 
 import logging
 import database as db
-from keyboards import main_menu_kb, share_phone_kb
+from keyboards import main_menu_kb, share_phone_kb, skip_kb
 from locales import t
 import moysklad_api
 
@@ -18,9 +18,10 @@ logger = logging.getLogger(__name__)
 
 class RegStates(StatesGroup):
     waiting_phone = State()
+    waiting_address = State()
 
 
-async def _register_and_link_counterparty(telegram_id: int, name: str, phone_norm: str) -> None:
+async def _register_and_link_counterparty(telegram_id: int, name: str, phone_norm: str) -> bool:
     """
     Register user and safely link to existing MoySklad counterparty.
 
@@ -28,6 +29,8 @@ async def _register_and_link_counterparty(telegram_id: int, name: str, phone_nor
     1) Reuse counterparty id from local DB by same phone
     2) Find existing counterparty in MoySklad by phone
     3) Create new counterparty only if nothing was found
+
+    Returns True if a brand-new counterparty was created, False if an existing one was linked.
     """
     existing_user = await db.get_user_by_phone(phone_norm)
     existing_cp_id = existing_user.get("moysklad_counterparty_id") if existing_user else None
@@ -42,14 +45,14 @@ async def _register_and_link_counterparty(telegram_id: int, name: str, phone_nor
     if existing_cp_id:
         await db.save_moysklad_counterparty_id(telegram_id, existing_cp_id)
         logger.info("Reused local counterparty ID %s for user %s", existing_cp_id, telegram_id)
-        return
+        return False
 
     try:
         cp_id = await moysklad_api.find_counterparty_id_by_phone(phone_norm)
         if cp_id:
             await db.save_moysklad_counterparty_id(telegram_id, cp_id)
             logger.info("Linked existing MoySklad counterparty ID %s for user %s", cp_id, telegram_id)
-            return
+            return False
     except Exception as e:
         logger.error("Error finding counterparty by phone %s: %s", phone_norm, e)
 
@@ -61,6 +64,8 @@ async def _register_and_link_counterparty(telegram_id: int, name: str, phone_nor
             logger.info("Created and saved MoySklad counterparty ID %s for user %s", cp_id, telegram_id)
     except Exception as e:
         logger.error("Error syncing with MoySklad: %s", e)
+
+    return True
 
 
 @router.message(CommandStart())
@@ -82,6 +87,16 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
     )
 
 
+async def _finish_registration(message: Message, state: FSMContext, is_new: bool) -> None:
+    """After phone: ask address for new counterparties, go straight to menu for existing ones."""
+    if is_new:
+        await state.set_state(RegStates.waiting_address)
+        await message.answer(t("ask_address", "uz"), reply_markup=skip_kb("uz"))
+    else:
+        await state.clear()
+        await message.answer(t("registered_success", "uz"), reply_markup=main_menu_kb("uz"))
+
+
 @router.message(RegStates.waiting_phone, F.contact)
 async def handle_contact(message: Message, state: FSMContext) -> None:
     contact: Contact = message.contact
@@ -89,14 +104,8 @@ async def handle_contact(message: Message, state: FSMContext) -> None:
     name = message.from_user.full_name or contact.first_name or "Mijoz"
 
     phone_norm = db.normalize_phone(phone)
-    await _register_and_link_counterparty(message.from_user.id, name, phone_norm)
-
-    await state.clear()
-
-    await message.answer(
-        t("registered_success", "uz"),
-        reply_markup=main_menu_kb("uz"),
-    )
+    is_new = await _register_and_link_counterparty(message.from_user.id, name, phone_norm)
+    await _finish_registration(message, state, is_new)
 
 
 @router.message(RegStates.waiting_phone)
@@ -113,11 +122,24 @@ async def handle_phone_text(message: Message, state: FSMContext) -> None:
 
     name = message.from_user.full_name or "Mijoz"
     phone_norm = db.normalize_phone(digits)
-    await _register_and_link_counterparty(message.from_user.id, name, phone_norm)
+    is_new = await _register_and_link_counterparty(message.from_user.id, name, phone_norm)
+    await _finish_registration(message, state, is_new)
+
+
+@router.message(RegStates.waiting_address)
+async def handle_reg_address(message: Message, state: FSMContext) -> None:
+    """Address step during registration: save or skip."""
+    address = (message.text or "").strip()
+    skip_text = t("skip_address_btn", "uz")
+
+    if address and address != skip_text:
+        user = await db.get_user(message.from_user.id)
+        cp_id = user.get("moysklad_counterparty_id") if user else None
+        if cp_id:
+            try:
+                await moysklad_api.update_counterparty_address(cp_id, address)
+            except Exception as e:
+                logger.error("Error saving address during registration for user %s: %s", message.from_user.id, e)
 
     await state.clear()
-
-    await message.answer(
-        t("registered_success", "uz"),
-        reply_markup=main_menu_kb("uz"),
-    )
+    await message.answer(t("registered_success", "uz"), reply_markup=main_menu_kb("uz"))

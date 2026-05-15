@@ -349,7 +349,33 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
     },
 
-    # ── Errors ─────────────────────────────────────────────────────────────
+    # ── Address ────────────────────────────────────────────────────────────
+    "btn_address": {
+        "uz": "📍 Manzilim",
+        "ru": "📍 Мой адрес",
+    },
+    "ask_address": {
+        "uz": "📍 Yetkazib berish manzilingizni kiriting:\n(Shahar, ko'cha, uy raqami)",
+        "ru": "📍 Введите ваш адрес доставки:\n(Город, улица, номер дома)",
+    },
+    "skip_address_btn": {
+        "uz": "⏭ O'tkazib yuborish",
+        "ru": "⏭ Пропустить",
+    },
+    "address_saved": {
+        "uz": "✅ Manzilingiz saqlandi!",
+        "ru": "✅ Адрес сохранён!",
+    },
+    "address_updated": {
+        "uz": "✅ Manzilingiz yangilandi!",
+        "ru": "✅ Адрес обновлён!",
+    },
+    "address_save_error": {
+        "uz": "⚠️ Manzilni saqlashda xato yuz berdi. Keyinroq qayta urinib ko'ring.",
+        "ru": "⚠️ Ошибка при сохранении адреса. Попробуйте позже.",
+    },
+
+    # ── Errors ────────────────────────────────────────────────────────────
     "not_registered": {
         "uz": "❌ Siz ro'yxatdan o'tmagansiz. /start bosing.",
         "ru": "❌ Вы не зарегистрированы. Нажмите /start.",

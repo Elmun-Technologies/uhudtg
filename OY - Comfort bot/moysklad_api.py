@@ -150,6 +150,12 @@ async def sync_counterparty(name: str, phone: str, telegram_id: int) -> dict:
         raise
 
 
+async def update_counterparty_address(counterparty_id: str, address: str) -> dict:
+    """Update the actualAddress field of a MoySklad counterparty."""
+    url = f"{MOYSKLAD_API}/entity/counterparty/{counterparty_id}"
+    return await _put(url, json_data={"actualAddress": address})
+
+
 async def fetch_entity(href: str) -> dict:
     """Fetch any MoySklad entity by its full href URL."""
     params = {

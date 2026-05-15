@@ -14,7 +14,7 @@ import logging
 from html import escape
 
 import database as db
-from keyboards import language_kb, main_menu_kb, report_nav_kb, report_period_kb
+from keyboards import language_kb, main_menu_kb, report_nav_kb, report_period_kb, skip_kb
 from locales import t
 from moysklad_api import (
     format_moment,
@@ -22,6 +22,7 @@ from moysklad_api import (
     fetch_counterparty_balance,
     fetch_demands_for_counterparty,
     fetch_salesreturns_for_counterparty,
+    update_counterparty_address,
 )
 from time_utils import local_today
 from formatting import doc_number_for_template, fmt_quantity, fmt_usd
@@ -74,8 +75,14 @@ MENU_BALANCE_TEXTS = {"💰 Balans", "💰 Баланс"}
 MENU_ORDERS_TEXTS = {"🛒 Buyurtmalar", "🛒 Заказы"}
 MENU_REPORT_TEXTS = {"📊 Hisobot", "📊 Отчёт"}
 MENU_LANG_TEXTS = {"🌐 Til", "🌐 Язык"}
+MENU_ADDRESS_TEXTS = {"📍 Manzilim", "📍 Мой адрес"}
+SKIP_ADDRESS_TEXTS = {"⏭ O'tkazib yuborish", "⏭ Пропустить"}
 
 MS_DOCUMENTS_TIMEOUT = 25.0
+
+
+class AddrStates(StatesGroup):
+    waiting_address = State()
 
 
 # ── Guard helper ───────────────────────────────────────────────────────────
@@ -663,9 +670,44 @@ async def handle_lang_callback(callback: CallbackQuery, state: FSMContext) -> No
     await callback.answer()
 
 
+@router.message(F.text.in_(MENU_ADDRESS_TEXTS))
+async def handle_address_menu(message: Message, state: FSMContext) -> None:
+    user = await _get_user_or_warn(message)
+    if not user:
+        return
+    lang = user.get("language") or "uz"
+    await state.set_state(AddrStates.waiting_address)
+    await message.answer(t("ask_address", lang), reply_markup=skip_kb(lang))
+
+
+@router.message(AddrStates.waiting_address)
+async def handle_address_update(message: Message, state: FSMContext) -> None:
+    user = await db.get_user(message.from_user.id)
+    lang = (user.get("language") or "uz") if user else "uz"
+    address = (message.text or "").strip()
+
+    await state.clear()
+
+    if not address or address in SKIP_ADDRESS_TEXTS:
+        await message.answer(t("main_menu", lang), reply_markup=main_menu_kb(lang))
+        return
+
+    cp_id = user.get("moysklad_counterparty_id") if user else None
+    if not cp_id:
+        await message.answer(t("main_menu", lang), reply_markup=main_menu_kb(lang))
+        return
+
+    try:
+        await update_counterparty_address(cp_id, address)
+        await message.answer(t("address_updated", lang), reply_markup=main_menu_kb(lang))
+    except Exception as e:
+        logger.error("Error updating address for user %s: %s", message.from_user.id, e)
+        await message.answer(t("address_save_error", lang), reply_markup=main_menu_kb(lang))
+
+
 @router.message()
 async def handle_fallback_message(message: Message, state: FSMContext) -> None:
-    """Stiker, boshqa matn, tugma matni emas — 'is not handled' o‘rniga menyuni qaytarish."""
+    """Stiker, boshqa matn, tugma matni emas — ‘is not handled’ o’rniga menyuni qaytarish."""
     user = await db.get_user(message.from_user.id)
     if not user:
         await message.answer(t("not_registered", "uz"))
