@@ -7,19 +7,20 @@ services:
     dns:
       - 8.8.8.8
       - 1.1.1.1
-    # Faqat localhost ga ochiladi — mavjud nginx/caddy orqali proxy qilinadi.
-    # WEBHOOK_HOST_PORT ni .env da o'zgartiring (default: 8082).
-    # Boshqa loyihada 8082 band bo'lsa boshqa port tanlang (masalan 8083).
+    # Port WEBHOOK_HOST_PORT (.env da belgilangan, masalan 8081).
+    # Mavjud Traefik yoki nginx orqali routing qilinadi.
     ports:
-      - "127.0.0.1:${WEBHOOK_HOST_PORT:-8082}:8080"
+      - target: 8080
+        published: "${WEBHOOK_HOST_PORT:-}"
+        protocol: tcp
     volumes:
-      - comfort_bot_data:/data
+      - bot_data:/data          # nom o'zgartirilmadi — mavjud DB saqlanadi
       - ./assets:/app/assets
     networks:
       - comfort_bot_net
 
 volumes:
-  comfort_bot_data:
+  bot_data:
 
 networks:
   comfort_bot_net:
