@@ -158,7 +158,9 @@ async def run_customer_reports(bot) -> None:
         cp_id = user.get("moysklad_counterparty_id")
         if not cp_id:
             continue
-        telegram_id = user["telegram_id"]
+        telegram_id = user.get("telegram_id")
+        if not telegram_id:
+            continue
         lang = user.get("language") or "uz"
 
         try:

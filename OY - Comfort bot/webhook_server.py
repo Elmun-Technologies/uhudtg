@@ -138,10 +138,14 @@ async def _process_order(href: str) -> None:
     raw   = await ms.fetch_entity(href)
     order = ms.parse_order(raw)
 
+    if not order["agent_phone"]:
+        logger.info("Order %s: agent has no phone, skipping notification", order["order_number"])
+        return
+
     user        = await db.get_user_by_phone(order["agent_phone"])
-    telegram_id = user["telegram_id"] if user else None
-    lang        = user["language"]    if user else "uz"
-    balance = float(user["balance_usd"]) if user and user.get("balance_usd") is not None else 0.0
+    telegram_id = user.get("telegram_id") if user else None
+    lang        = (user.get("language") or "uz") if user else "uz"
+    balance     = float(user["balance_usd"]) if user and user.get("balance_usd") is not None else 0.0
 
     if telegram_id and order["agent_id"]:
         await db.save_moysklad_counterparty_id(telegram_id, order["agent_id"])
@@ -175,9 +179,13 @@ async def _process_shipment(href: str) -> None:
     shipment = ms.parse_demand(raw)
     await ms.enrich_demand_from_moysklad(raw, shipment)
 
+    if not shipment["agent_phone"]:
+        logger.info("Shipment %s: agent has no phone, skipping notification", shipment["shipment_number"])
+        return
+
     user        = await db.get_user_by_phone(shipment["agent_phone"])
-    telegram_id = user["telegram_id"] if user else None
-    lang        = user["language"]    if user else "uz"
+    telegram_id = user.get("telegram_id") if user else None
+    lang        = (user.get("language") or "uz") if user else "uz"
 
     balance_after = 0.0
     if shipment["agent_id"]:
@@ -250,9 +258,13 @@ async def _process_payment(href: str, payment_type: str) -> None:
     raw     = await ms.fetch_entity(href)
     payment = ms.parse_payment(raw, payment_type)
 
+    if not payment["agent_phone"]:
+        logger.info("Payment %s: agent has no phone, skipping notification", payment["payment_number"])
+        return
+
     user        = await db.get_user_by_phone(payment["agent_phone"])
-    telegram_id = user["telegram_id"] if user else None
-    lang        = user["language"]    if user else "uz"
+    telegram_id = user.get("telegram_id") if user else None
+    lang        = (user.get("language") or "uz") if user else "uz"
 
     balance = 0.0
     if payment["agent_id"]:
@@ -294,9 +306,13 @@ async def _process_salesreturn(href: str) -> None:
     raw = await ms.fetch_entity(href)
     ret = ms.parse_salesreturn(raw)
 
+    if not ret["agent_phone"]:
+        logger.info("Salesreturn %s: agent has no phone, skipping notification", ret["return_number"])
+        return
+
     user = await db.get_user_by_phone(ret["agent_phone"])
-    telegram_id = user["telegram_id"] if user else None
-    lang = user["language"] if user else "uz"
+    telegram_id = user.get("telegram_id") if user else None
+    lang = (user.get("language") or "uz") if user else "uz"
 
     balance_after = 0.0
     if ret["agent_id"]:
@@ -341,9 +357,13 @@ async def _process_supply(href: str) -> None:
     raw = await ms.fetch_entity(href)
     supply = ms.parse_supply(raw)
 
+    if not supply["agent_phone"]:
+        logger.info("Supply %s: agent has no phone, skipping notification", supply["supply_number"])
+        return
+
     user = await db.get_user_by_phone(supply["agent_phone"])
-    telegram_id = user["telegram_id"] if user else None
-    lang = user["language"] if user else "uz"
+    telegram_id = user.get("telegram_id") if user else None
+    lang = (user.get("language") or "uz") if user else "uz"
 
     balance_after = 0.0
     if supply["agent_id"]:
@@ -387,9 +407,13 @@ async def _process_purchasereturn(href: str) -> None:
     raw = await ms.fetch_entity(href)
     ret = ms.parse_purchasereturn(raw)
 
+    if not ret["agent_phone"]:
+        logger.info("Purchasereturn %s: agent has no phone, skipping notification", ret["return_number"])
+        return
+
     user = await db.get_user_by_phone(ret["agent_phone"])
-    telegram_id = user["telegram_id"] if user else None
-    lang = user["language"] if user else "uz"
+    telegram_id = user.get("telegram_id") if user else None
+    lang = (user.get("language") or "uz") if user else "uz"
 
     balance_after = 0.0
     if ret["agent_id"]:

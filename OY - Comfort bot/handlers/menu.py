@@ -153,7 +153,7 @@ async def handle_balance(message: Message, state: FSMContext) -> None:
     user = await _get_user_or_warn(message)
     if not user:
         return
-    lang = user["language"]
+    lang = user.get("language") or "uz"
     phone = user.get("phone") or ""
 
     cp_id: str | None = user.get("moysklad_counterparty_id")
@@ -228,7 +228,7 @@ async def handle_orders(message: Message, state: FSMContext) -> None:
     user = await _get_user_or_warn(message)
     if not user:
         return
-    lang = user["language"]
+    lang = user.get("language") or "uz"
 
     cp_id = await _resolve_counterparty_id(user)
     if not cp_id:
@@ -286,7 +286,7 @@ async def handle_report(message: Message, state: FSMContext) -> None:
     user = await _get_user_or_warn(message)
     if not user:
         return
-    lang = user["language"]
+    lang = user.get("language") or "uz"
 
     await state.set_state(ReportStates.choose_period)
     await state.update_data(lang=lang, offset=0, period=None)
@@ -683,7 +683,7 @@ async def handle_language(message: Message, state: FSMContext) -> None:
     if not user:
         return
     await message.answer(
-        t("choose_language", user["language"]),
+        t("choose_language", user.get("language") or "uz"),
         reply_markup=language_kb(),
     )
 

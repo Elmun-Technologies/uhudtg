@@ -74,7 +74,7 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
 
     user = await db.get_user(message.from_user.id)
     if user:
-        lang = user["language"]
+        lang = user.get("language") or "uz"
         await message.answer(t("already_registered", lang))
         if not user.get("moysklad_counterparty_id"):
             await message.answer(t("no_counterparty_for_list", lang))
