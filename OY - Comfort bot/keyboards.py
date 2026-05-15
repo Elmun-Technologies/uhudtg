@@ -21,8 +21,19 @@ def main_menu_kb(lang: str = "uz") -> ReplyKeyboardMarkup:
                 KeyboardButton(text=t("btn_report", lang)),
                 KeyboardButton(text=t("btn_language", lang)),
             ],
+            [
+                KeyboardButton(text=t("btn_address", lang)),
+            ],
         ],
         resize_keyboard=True,
+    )
+
+
+def skip_kb(lang: str = "uz") -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=t("skip_address_btn", lang))]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
     )
 
 

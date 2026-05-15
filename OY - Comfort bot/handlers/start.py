@@ -8,7 +8,7 @@ from aiogram.types import Contact, Message
 
 import logging
 import database as db
-from keyboards import main_menu_kb, share_phone_kb
+from keyboards import main_menu_kb, share_phone_kb, skip_kb
 from locales import t
 import moysklad_api
 
@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class RegStates(StatesGroup):
     waiting_phone = State()
+    waiting_address = State()
 
 
 async def _register_and_link_counterparty(telegram_id: int, name: str, phone_norm: str) -> None:
@@ -91,12 +92,8 @@ async def handle_contact(message: Message, state: FSMContext) -> None:
     phone_norm = db.normalize_phone(phone)
     await _register_and_link_counterparty(message.from_user.id, name, phone_norm)
 
-    await state.clear()
-
-    await message.answer(
-        t("registered_success", "uz"),
-        reply_markup=main_menu_kb("uz"),
-    )
+    await state.set_state(RegStates.waiting_address)
+    await message.answer(t("ask_address", "uz"), reply_markup=skip_kb("uz"))
 
 
 @router.message(RegStates.waiting_phone)
@@ -115,9 +112,24 @@ async def handle_phone_text(message: Message, state: FSMContext) -> None:
     phone_norm = db.normalize_phone(digits)
     await _register_and_link_counterparty(message.from_user.id, name, phone_norm)
 
-    await state.clear()
+    await state.set_state(RegStates.waiting_address)
+    await message.answer(t("ask_address", "uz"), reply_markup=skip_kb("uz"))
 
-    await message.answer(
-        t("registered_success", "uz"),
-        reply_markup=main_menu_kb("uz"),
-    )
+
+@router.message(RegStates.waiting_address)
+async def handle_reg_address(message: Message, state: FSMContext) -> None:
+    """Address step during registration: save or skip."""
+    address = (message.text or "").strip()
+    skip_text = t("skip_address_btn", "uz")
+
+    if address and address != skip_text:
+        user = await db.get_user(message.from_user.id)
+        cp_id = user.get("moysklad_counterparty_id") if user else None
+        if cp_id:
+            try:
+                await moysklad_api.update_counterparty_address(cp_id, address)
+            except Exception as e:
+                logger.error("Error saving address during registration for user %s: %s", message.from_user.id, e)
+
+    await state.clear()
+    await message.answer(t("registered_success", "uz"), reply_markup=main_menu_kb("uz"))
