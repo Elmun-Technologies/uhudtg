@@ -106,27 +106,10 @@ async def _put(url: str, json_data: dict | None = None) -> dict:
 
 
 async def sync_counterparty(name: str, phone: str, telegram_id: int) -> dict:
-    """
-    Найти контрагента по телефону и добавить Telegram ID в атрибуты.
-
-    ВАЖНО: если контрагент уже существует — обновляем ТОЛЬКО атрибут telegram_id,
-    не трогая имя и телефон (они управляются менеджером в МойСклад).
-    Если контрагент не найден — создаём нового.
-    """
+    """Find counterparty by phone or create new one. Telegram ID is stored in local DB only."""
     url = f"{MOYSKLAD_API}/entity/counterparty"
 
-    # Атрибут Telegram ID (кастомный атрибут в МойСклад)
-    tg_attribute = {
-        "meta": {
-            "href": f"{MOYSKLAD_API}/entity/counterparty/metadata/attributes/8666aeb7-192b-11f1-0a80-00f20005e1af",
-            "type": "attributemetadata",
-            "mediaType": "application/json",
-        },
-        "value": str(telegram_id),
-    }
-
     try:
-        # Prefer robust multi-format search to avoid duplicate counterparties.
         existing_cp_id = await find_counterparty_id_by_phone(phone)
         if existing_cp_id:
             matched = await _get(f"{url}/{existing_cp_id}")
@@ -136,13 +119,8 @@ async def sync_counterparty(name: str, phone: str, telegram_id: int) -> dict:
             )
             return matched
 
-        # Контрагент не найден — создаём нового
         logger.info("Counterparty not found for phone %s, creating new", phone)
-        new_data = {
-            "name": name,
-            "phone": phone,
-            "attributes": [tg_attribute],
-        }
+        new_data = {"name": name, "phone": phone}
         return await _post(url, json_data=new_data)
 
     except Exception as e:
