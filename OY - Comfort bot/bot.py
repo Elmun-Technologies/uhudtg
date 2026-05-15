@@ -12,7 +12,7 @@ import database as db
 import moysklad_api as moysklad
 import webhook_server
 import scheduler
-from config import BOT_TOKEN, WEBHOOK_PORT
+from config import BOT_TOKEN, WEBHOOK_PORT, WEBHOOK_SECRET
 from handlers import start, menu
 
 logging.basicConfig(
@@ -22,6 +22,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 async def main() -> None:
+    if not BOT_TOKEN:
+        raise RuntimeError("BOT_TOKEN .env da bo'sh — to'ldiring")
+    if not WEBHOOK_SECRET:
+        raise RuntimeError("WEBHOOK_SECRET .env da bo'sh — istalgan tasodifiy satr qo'ying")
+
     # Init database
     await db.init_db()
     logger.info("Database initialised.")

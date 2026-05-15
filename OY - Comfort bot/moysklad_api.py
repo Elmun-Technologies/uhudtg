@@ -84,25 +84,43 @@ async def close_moysklad_http() -> None:
             _http_client = None
 
 
+async def _handle_response(resp: httpx.Response, method: str, url: str, retry) -> dict:
+    """Centralised 401/429/5xx handling. retry: zero-arg coroutine to retry the call once."""
+    if resp.status_code == 401:
+        logger.error("MoySklad 401 Unauthorized — MOYSKLAD_TOKEN noto'g'ri yoki muddati o'tgan")
+        resp.raise_for_status()
+    if resp.status_code == 429:
+        retry_after = resp.headers.get("Retry-After")
+        try:
+            wait_s = float(retry_after) if retry_after else 2.0
+        except ValueError:
+            wait_s = 2.0
+        wait_s = min(max(wait_s, 1.0), 30.0)
+        logger.warning("MoySklad 429 Rate Limited — sleeping %.1fs then retrying %s %s", wait_s, method, url)
+        await asyncio.sleep(wait_s)
+        resp2 = await retry()
+        resp2.raise_for_status()
+        return resp2.json()
+    resp.raise_for_status()
+    return resp.json()
+
+
 async def _get(url: str, params: dict | None = None) -> dict:
     client = await _shared_http()
     resp = await client.get(url, params=params)
-    resp.raise_for_status()
-    return resp.json()
+    return await _handle_response(resp, "GET", url, lambda: client.get(url, params=params))
 
 
 async def _post(url: str, json_data: dict | None = None) -> dict:
     client = await _shared_http()
     resp = await client.post(url, json=json_data)
-    resp.raise_for_status()
-    return resp.json()
+    return await _handle_response(resp, "POST", url, lambda: client.post(url, json=json_data))
 
 
 async def _put(url: str, json_data: dict | None = None) -> dict:
     client = await _shared_http()
     resp = await client.put(url, json=json_data)
-    resp.raise_for_status()
-    return resp.json()
+    return await _handle_response(resp, "PUT", url, lambda: client.put(url, json=json_data))
 
 
 async def sync_counterparty(name: str, phone: str, telegram_id: int) -> dict:
@@ -176,7 +194,7 @@ def parse_payment(data: dict, payment_type: str) -> dict:
       • cashout / paymentout — мы выплатили деньги (расход)
     """
     agent = data.get("agent", {}) or {}
-    agent_phone = agent.get("phone", "")
+    agent_phone = agent.get("phone") or ""
     rate = data.get("rate")
     # Сумму платежа показываем клиенту в валюте документа.
     amount_original = _to_original_amount(data.get("sum"))

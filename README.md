@@ -1,4 +1,4 @@
-# Telegram Bot — MoySklad integratsiyasi
+# Comfort Textile — Telegram Bot
 
 Mijozlar uchun Telegram bot. MoySklad ERP tizimi bilan to'liq integratsiya qilingan: buyurtmalar, otgruzkalar, to'lovlar haqida real vaqt bildirishnomalari, balans ko'rish, hisobot olish va manzil saqlash.
 
@@ -8,12 +8,13 @@ Mijozlar uchun Telegram bot. MoySklad ERP tizimi bilan to'liq integratsiya qilin
 
 | Funksiya | Tavsif |
 |---|---|
-| 📱 Ro'yxatdan o'tish | Telefon raqami orqali avtomatik MoySklad kontragentga ulanish |
+| 📱 Ro'yxatdan o'tish | Telefon raqami orqali avtomatik MoySklad kontragentga ulanish (yoki yangisini yaratish) |
 | 📍 Manzil | Yetkazib berish manzilini yuborish — MoySklad kontragentga saqlanadi |
 | 💰 Balans | Joriy qoldiq (MoySklad dan jonli) |
 | 🛒 Buyurtmalar | So'nggi otgruzkalar ro'yxati |
-| 📊 Hisobot | Davr bo'yicha PDF hisobot (kunlik / haftalik / oylik va boshqalar) |
+| 📊 Hisobot | Davr bo'yicha PDF hisobot |
 | 🔔 Bildirishnomalar | Buyurtma, otgruzka, qaytarish, to'lov — avtomatik xabar |
+| 📈 Kunlik hisobot | 20:00 da admin va otgruzkasi bo'lgan har bir mijozga avtomatik |
 | 🌐 Til | O'zbek / Rus tili |
 
 ---
@@ -23,123 +24,102 @@ Mijozlar uchun Telegram bot. MoySklad ERP tizimi bilan to'liq integratsiya qilin
 - **Python** 3.11
 - **aiogram** 3.7 — Telegram bot framework
 - **aiohttp** 3.9 — webhook server
-- **httpx** 0.27 — MoySklad API client (async)
-- **aiosqlite** 0.20 — SQLite bazasi
-- **reportlab** + **Pillow** — PDF hisobot generatsiya
-- **Docker** + **Caddy** — deploy va SSL
+- **httpx** 0.27 — MoySklad API client
+- **aiosqlite** 0.20 — SQLite
+- **reportlab** + **Pillow** — PDF hisobot
+- **Docker Compose** — deploy
+
+HTTPS va routing — Traefik (yoki har qanday tashqi reverse proxy) qiladi. Bot o'zi SSL boshqarmaydi.
 
 ---
 
 ## Sozlash
 
-### 1. `.env` fayli yaratish
+### 1. `.env` faylini to'ldiring
 
 ```bash
-cp "OY - Comfort bot/.env.example" "OY - Comfort bot/.env"
+cp "OY - Comfort bot/.env.example" .env
 ```
-
-`.env` faylini to'ldiring:
 
 | O'zgaruvchi | Qayerdan olish |
 |---|---|
-| `BOT_TOKEN` | @BotFather → /newbot |
+| `BOT_TOKEN` | @BotFather → `/newbot` |
 | `MOYSKLAD_TOKEN` | MoySklad → Sozlamalar → Foydalanuvchilar → Kirish kalitlari |
-| `WEBHOOK_HOST` | Server domeningiz (`https://yourdomain.com`) |
-| `WEBHOOK_SECRET` | Istalgan tasodifiy satr (webhook himoyasi uchun) |
-| `ADMIN_IDS` | Admin Telegram ID-lari, vergul bilan (`123456,789012`) |
-| `COMPANY_PHONE` | Kompaniya telefon raqami (botda ko'rsatiladi) |
-| `DB_PATH` | Docker uchun: `/data/comfort_bot.db` |
+| `WEBHOOK_HOST` | Tashqi HTTPS URL (`https://your.domain` yoki `https://1-2-3-4.sslip.io`) |
+| `WEBHOOK_SECRET` | Tasodifiy satr — `openssl rand -hex 24` |
+| `ADMIN_IDS` | Admin Telegram ID-lar, vergul bilan |
+| `COMPANY_PHONE` | Botda ko'rsatiladigan kompaniya telefoni |
+| `DB_PATH` | Docker uchun majburiy: `/data/comfort_bot.db` |
+
+> ⚠️ `.env` faylini hech qachon git ga commit qilmang.
 
 ### 2. Logotip
 
-PDF hisobot uchun logotip fayl qo'ying:
-
+PDF hisobot uchun:
 ```
-OY - Comfort bot/assets/logo.png
+assets/logo.png
 ```
-
-Tavsiya etilgan o'lcham: 200×200 px, PNG format.
-
-### 3. MoySklad webhook-larini ulash
-
-`register_webhooks.py` skriptini bir marta ishga tushiring:
-
-```bash
-cd "OY - Comfort bot"
-python register_webhooks.py
-```
-
-Yoki MoySklad panelidan qo'lda: **Sozlamalar → Webhook-lar → Yaratish**
-
-Ro'yxatga olinishi kerak bo'lgan voqealar:
-
-| Voqea | URL |
-|---|---|
-| Buyurtma — Yaratish | `https://yourdomain.com/moysklad/webhook?secret=SECRET` |
-| Otgruzka — Yaratish | `https://yourdomain.com/moysklad/webhook?secret=SECRET` |
-| Savdo qaytarish — Yaratish | `https://yourdomain.com/moysklad/webhook?secret=SECRET` |
-| Kirim to'lov — Yaratish | `https://yourdomain.com/moysklad/webhook?secret=SECRET` |
-| Chiqim to'lov — Yaratish | `https://yourdomain.com/moysklad/webhook?secret=SECRET` |
-| Ta'minot — Yaratish | `https://yourdomain.com/moysklad/webhook?secret=SECRET` |
-| Ta'minotchi qaytarish — Yaratish | `https://yourdomain.com/moysklad/webhook?secret=SECRET` |
-
-### 4. Telegram ID maxsus atributi (MoySklad)
-
-Botni webhook bildirishnomalar yuborishi uchun MoySklad kontragentda **Telegram ID** maxsus atributi bo'lishi kerak.
-
-`moysklad_api.py` faylida UUID ni yangilang (tegishli qatorda):
-
-```python
-"href": f"{MOYSKLAD_API}/entity/counterparty/metadata/attributes/<UUID>",
-```
-
-UUID ni topish uchun:
-```bash
-python list_attributes.py
-```
+Tavsiya: 200×200 px PNG.
 
 ---
 
 ## Docker bilan ishga tushirish (tavsiya etiladi)
 
 ### Talablar
+- Docker 24+ va Docker Compose v2
+- Tashqi reverse proxy (Traefik / nginx / Caddy) — HTTPS uchun
+- Tashqaridan kirish mumkin bo'lgan domen yoki IP
 
-- Docker 24+
-- Docker Compose v2
-- Ochiq portlar: `80`, `443`, `8080`
-
-### Ishga tushirish
+### Oddiy holat (mustaqil server)
 
 ```bash
-# 1. Repozitoriyni clone qiling
 git clone <repo-url>
 cd uhudtg
-
-# 2. .env faylini to'ldiring (yuqoridagi bo'limga qarang)
-
-# 3. Domenni Caddyfile ga kiriting
-echo 'yourdomain.com {
-    reverse_proxy /moysklad/* bot:8080
-}' > Caddyfile
-
-# 4. Konteynerlarni ishga tushiring
+cp "OY - Comfort bot/.env.example" .env
+# .env faylini to'ldiring
 docker compose up -d --build
+docker compose logs -f bot
+```
 
-# 5. Webhook larni ro'yxatdan o'tkazing
+### Traefik (Dokploy/Coolify) bilan
+
+`docker-compose.yml` da Traefik labellar va `dokploy-network` allaqachon sozlangan. Faqat `Host()` qiymatini o'zingizning domeningizga moslab qo'ying:
+
+```yaml
+- "traefik.http.routers.comfort-bot.rule=Host(`your.domain`) && PathPrefix(`/moysklad`)"
+```
+
+Traefik `letsencrypt` resolver bilan SSL avtomatik oladi.
+
+### MoySklad webhook larini ulash
+
+MoySklad → Sozlamalar → Webhook lar → Yaratish:
+
+| Maydon | Qiymat |
+|---|---|
+| URL | `https://your.domain/moysklad/webhook?secret=YOUR_SECRET` |
+| Hodisalar | `customerorder`, `demand`, `paymentin`, `cashin`, `salesreturn`, `supply`, `purchasereturn` (CREATE) |
+
+Yoki avtomatik:
+```bash
 docker compose exec bot python register_webhooks.py
 ```
 
-### Foydali buyruqlar
+---
+
+## Foydali buyruqlar
 
 ```bash
-# Loglarni ko'rish
-docker compose logs -f bot
+docker compose logs -f bot              # loglar
+docker compose restart bot              # qayta start
+docker compose down && docker compose up -d --build   # to'liq qayta build
 
-# Botni qayta ishga tushirish
-docker compose restart bot
-
-# To'xtatish
-docker compose down
+# DB ga kirish (foydalanuvchilar ro'yxati)
+docker exec comfort-bot-bot-1 python -c "
+import sqlite3
+c = sqlite3.connect('/data/comfort_bot.db')
+for r in c.execute('SELECT telegram_id, phone, moysklad_counterparty_id FROM users'): print(r)
+"
 ```
 
 ---
@@ -149,14 +129,13 @@ docker compose down
 ```bash
 cd "OY - Comfort bot"
 pip install -r requirements.txt
-python bot.py
+DB_PATH=./comfort_bot.db python bot.py
 ```
 
-Webhook larni lokal test qilish uchun [ngrok](https://ngrok.com/) dan foydalaning:
-
+Webhook larni lokal test qilish uchun [ngrok](https://ngrok.com/):
 ```bash
 ngrok http 8080
-# Olingan HTTPS URL ni WEBHOOK_HOST ga kiriting
+# olingan HTTPS URL ni .env dagi WEBHOOK_HOST ga yozing
 ```
 
 ---
@@ -168,35 +147,29 @@ uhudtg/
 ├── OY - Comfort bot/
 │   ├── bot.py                  ← Asosiy kirish nuqtasi
 │   ├── config.py               ← .env dan konfiguratsiya
-│   ├── database.py             ← SQLite: foydalanuvchilar, buyurtmalar
+│   ├── database.py             ← SQLite (foydalanuvchilar)
 │   ├── moysklad_api.py         ← MoySklad API client
 │   ├── webhook_server.py       ← MoySklad webhook qabul qiluvchi
 │   ├── scheduler.py            ← Kunlik hisobot rejalashtiruvchi
-│   ├── daily_report.py         ← Admin hisobot generatori
-│   ├── pdf_generator.py        ← PDF hisobot generatori
+│   ├── daily_report.py         ← Admin + mijoz kunlik hisoboti
+│   ├── pdf_generator.py        ← PDF hisobot
 │   ├── locales.py              ← Matnlar (uz / ru)
 │   ├── keyboards.py            ← Telegram tugmalar
-│   ├── formatting.py           ← Raqam va sana formatlash
-│   ├── time_utils.py           ← Vaqt zonasi yordamchisi
 │   ├── handlers/
 │   │   ├── start.py            ← /start, ro'yxatdan o'tish, manzil
 │   │   └── menu.py             ← Balans, Buyurtmalar, Hisobot, Til, Manzil
-│   ├── register_webhooks.py    ← Webhook larni bir marta ro'yxatdan o'tkazish
-│   ├── list_webhooks.py        ← Ro'yxatdagi webhook larni ko'rish
-│   ├── cleanup_webhooks.py     ← Barcha webhook larni o'chirish
-│   ├── list_attributes.py      ← Kontragent maxsus atributlari va UUID lari
-│   ├── restore_users.py        ← MoySklad dan foydalanuvchilarni tiklash
-│   ├── sync_users.py           ← Foydalanuvchilarni sinxronlash
-│   ├── sync_balances.py        ← Barcha foydalanuvchilar balansini yangilash
-│   ├── assets/
-│   │   └── logo.png            ← PDF uchun logotip (qo'lda qo'shiladi)
-│   ├── .env                    ← Tokenlar (git ga commit qilinmaydi!)
-│   ├── .env.example            ← Shablon
+│   ├── register_webhooks.py    ← MoySklad webhook larini ulash
+│   ├── list_webhooks.py
+│   ├── cleanup_webhooks.py
+│   ├── sync_balances.py        ← Barcha balanslarni yangilash
+│   ├── healthcheck.py
 │   ├── Dockerfile
+│   ├── .env.example
 │   └── requirements.txt
+├── assets/
+│   └── logo.png                ← PDF uchun (qo'lda qo'shiladi)
 ├── docker-compose.yml
-├── Caddyfile
-└── deploy/                     ← Server sozlash skriptlari
+└── deploy/                     ← Server yordamchi skriptlar
 ```
 
 ---
@@ -205,45 +178,37 @@ uhudtg/
 
 ```
 /start
-  └─► Telefon raqam so'raladi
-        └─► MoySklad da qidiriladi
-              ├─► Topildi (mavjud kontragent)
-              │     └─► Asosiy menyu
-              └─► Topilmadi (yangi mijoz)
-                    └─► Manzil so'raladi (o'tkazish mumkin)
+  └─► Telefon so'raladi
+        └─► MoySklad da telefon bo'yicha qidiriladi
+              ├─► Topildi → Mavjud kontragentga bog'lanadi
+              └─► Topilmadi → Yangi kontragent yaratiladi
+                    └─► Manzil so'raladi (o'tkazsa ham bo'ladi)
                           └─► Asosiy menyu
 ```
 
-Mavjud mijozlar `📍 Manzilim` tugmasi orqali manzilni istalgan vaqt yangilay oladi.
+Mavjud mijozlar `📍 Manzilim` orqali manzilni istalgan vaqt yangilay oladi.
 
 ---
 
-## MoySklad ↔ Telegram ma'lumot oqimi
+## Bildirishnomalar oqimi
 
 ```
-Telegram → MoySklad
-  Telefon  → phone
-  Ism      → name
-  TG ID    → maxsus atribut
-  Manzil   → actualAddress
+MoySklad → bot (webhook orqali)
+  Buyurtma yaratildi    → Mijozga matnli xabar
+  Otgruzka yaratildi    → Mijozga PDF + xabar
+  To'lov qabul qilindi  → Mijozga xabar
+  Qaytarish             → Mijozga xabar
 
-MoySklad → Telegram (webhook orqali)
-  Buyurtma yaratildi    → Bildirishnoma
-  Otgruzka yaratildi    → Bildirishnoma + PDF
-  To'lov qabul qilindi  → Bildirishnoma
-  Qaytarish             → Bildirishnoma
+Bot (har kuni 20:00 Asia/Tashkent)
+  Admin lar             → To'liq aggregatsiya hisoboti
+  Bugun otgruzkasi bor mijozlar → Shaxsiy qisqa hisobot
 ```
 
 ---
 
-## Foydali skriptlar
+## Maslahatlar
 
-| Skript | Vazifasi |
-|---|---|
-| `register_webhooks.py` | MoySklad webhook larini bir marta ro'yxatdan o'tkazish |
-| `list_webhooks.py` | Ro'yxatdagi webhook larni ko'rish |
-| `cleanup_webhooks.py` | Barcha webhook larni o'chirish |
-| `list_attributes.py` | Kontragent maxsus atributlarini va UUID larini ko'rish |
-| `restore_users.py` | MoySklad dan foydalanuvchilar jadvalini tiklash |
-| `sync_balances.py` | Barcha foydalanuvchilar balansini yangilash |
-| `healthcheck.py` | Bot holat tekshiruvi |
+- `WEBHOOK_SECRET` ni hech qachon predictable qilmang — `openssl rand -hex 24`
+- `MOYSKLAD_TOKEN` muddati o'tsa, bot `401` xato beradi va loglarda aniq yozadi
+- Bot trafikni ko'p iste'mol qilsa, `WEBHOOK_WORKERS` ni `5–8` ga oshiring
+- `bot_data` Docker volume ni o'chirmang — foydalanuvchilar ro'yxati shu yerda

@@ -136,12 +136,52 @@ async def run_for_today(bot) -> None:
     logger.info("daily_report: sent to %d/%d admin(s)", sent, len(ADMIN_IDS))
 
 
-async def run_customer_reports(bot) -> None:
-    """Bugungi otgruzkasi bo'lgan har bir mijozga shaxsiy kunlik hisobot yuborish.
+async def _build_and_send_customer_report(
+    bot, user: dict, *, moment_lo: str, moment_hi: str, date_label: str, sem: asyncio.Semaphore,
+) -> bool:
+    cp_id = user.get("moysklad_counterparty_id")
+    telegram_id = user.get("telegram_id")
+    if not cp_id or not telegram_id:
+        return False
+    lang = user.get("language") or "uz"
 
-    Faqat moysklad_counterparty_id bor va bugun demand (otgruzka) bo'lgan
-    foydalanuvchilarga yuboriladi.
-    """
+    async with sem:
+        try:
+            shipments = await ms.fetch_demands_for_counterparty(
+                cp_id, moment_lo=moment_lo, moment_hi=moment_hi,
+                result_limit=None, max_api_scan=500,
+            )
+        except Exception as e:
+            logger.error("customer_report: demands fetch failed user=%s: %s", telegram_id, e)
+            return False
+
+        if not shipments:
+            return False
+
+        ship_count = len(shipments)
+        ship_total = sum(s["total_usd"] for s in shipments)
+
+        try:
+            balance = await ms.fetch_counterparty_balance(cp_id)
+        except Exception:
+            balance = float(user.get("balance_usd") or 0.0)
+
+    try:
+        text = t(
+            "daily_customer_report", lang,
+            date=date_label, ship_count=ship_count,
+            ship_total=_fmt_money_ru(ship_total),
+            balance=_fmt_money_ru(balance),
+        )
+        await bot.send_message(telegram_id, text)
+        return True
+    except Exception as e:
+        logger.error("customer_report: send failed user=%s: %s", telegram_id, e)
+        return False
+
+
+async def run_customer_reports(bot) -> None:
+    """Bugungi otgruzkasi bo'lgan har bir mijozga shaxsiy kunlik hisobot yuborish."""
     today = local_today()
     moment_lo = f"{today.isoformat()} 00:00:00"
     moment_hi = f"{today.isoformat()} 23:59:59"
@@ -153,50 +193,13 @@ async def run_customer_reports(bot) -> None:
         logger.exception("customer_report: get_all_users failed: %s", e)
         return
 
-    sent_count = 0
-    for user in users:
-        cp_id = user.get("moysklad_counterparty_id")
-        if not cp_id:
-            continue
-        telegram_id = user.get("telegram_id")
-        if not telegram_id:
-            continue
-        lang = user.get("language") or "uz"
-
-        try:
-            shipments = await ms.fetch_demands_for_counterparty(
-                cp_id,
-                moment_lo=moment_lo,
-                moment_hi=moment_hi,
-                result_limit=None,
-                max_api_scan=500,
-            )
-        except Exception as e:
-            logger.error("customer_report: demands fetch failed user=%s: %s", telegram_id, e)
-            continue
-
-        if not shipments:
-            continue
-
-        ship_count = len(shipments)
-        ship_total = sum(s["total_usd"] for s in shipments)
-
-        try:
-            balance = await ms.fetch_counterparty_balance(cp_id)
-        except Exception:
-            balance = float(user.get("balance_usd") or 0.0)
-
-        try:
-            text = t(
-                "daily_customer_report", lang,
-                date=date_label,
-                ship_count=ship_count,
-                ship_total=_fmt_money_ru(ship_total),
-                balance=_fmt_money_ru(balance),
-            )
-            await bot.send_message(telegram_id, text)
-            sent_count += 1
-        except Exception as e:
-            logger.error("customer_report: send failed user=%s: %s", telegram_id, e)
-
+    sem = asyncio.Semaphore(4)
+    results = await asyncio.gather(*[
+        _build_and_send_customer_report(
+            bot, u, moment_lo=moment_lo, moment_hi=moment_hi,
+            date_label=date_label, sem=sem,
+        )
+        for u in users
+    ], return_exceptions=False)
+    sent_count = sum(1 for r in results if r)
     logger.info("customer_report: sent to %d customer(s)", sent_count)

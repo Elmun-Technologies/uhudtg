@@ -1,3 +1,0 @@
-{$DOMAIN} {
-    reverse_proxy /moysklad/* bot:8080
-}
