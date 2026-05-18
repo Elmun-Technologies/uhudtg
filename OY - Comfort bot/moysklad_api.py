@@ -123,8 +123,41 @@ async def _put(url: str, json_data: dict | None = None) -> dict:
     return await _handle_response(resp, "PUT", url, lambda: client.put(url, json=json_data))
 
 
+_tg_attribute_href: str | None = None
+_tg_attribute_lock: asyncio.Lock | None = None
+
+
+async def _get_telegram_attribute_href() -> str | None:
+    """
+    MoySklad akkauntidagi 'Telegram ID' nomli kontragent atributini topadi.
+    Topilmasa — avtomatik yaratadi. Natija xotirada saqlanadi (bir marta so'raladi).
+    """
+    global _tg_attribute_href, _tg_attribute_lock
+    if _tg_attribute_lock is None:
+        _tg_attribute_lock = asyncio.Lock()
+    async with _tg_attribute_lock:
+        if _tg_attribute_href:
+            return _tg_attribute_href
+        meta_url = f"{MOYSKLAD_API}/entity/counterparty/metadata/attributes"
+        try:
+            data = await _get(meta_url)
+            for attr in data.get("rows", []):
+                if (attr.get("name") or "").strip().lower() == "telegram id":
+                    _tg_attribute_href = attr["meta"]["href"]
+                    logger.info("Telegram ID attribute found: %s", _tg_attribute_href)
+                    return _tg_attribute_href
+            # Atribut yo'q — yaratamiz
+            created = await _post(meta_url, json_data={"name": "Telegram ID", "type": "string"})
+            _tg_attribute_href = created["meta"]["href"]
+            logger.info("Telegram ID attribute created: %s", _tg_attribute_href)
+            return _tg_attribute_href
+        except Exception as e:
+            logger.warning("Could not get/create Telegram ID attribute: %s", e)
+            return None
+
+
 async def sync_counterparty(name: str, phone: str, telegram_id: int) -> dict:
-    """Find counterparty by phone or create new one. Telegram ID is stored in local DB only."""
+    """Find counterparty by phone or create new one with Telegram ID attribute."""
     url = f"{MOYSKLAD_API}/entity/counterparty"
 
     try:
@@ -138,7 +171,15 @@ async def sync_counterparty(name: str, phone: str, telegram_id: int) -> dict:
             return matched
 
         logger.info("Counterparty not found for phone %s, creating new", phone)
-        new_data = {"name": name, "phone": phone}
+        new_data: dict = {"name": name, "phone": phone}
+
+        tg_href = await _get_telegram_attribute_href()
+        if tg_href:
+            new_data["attributes"] = [{
+                "meta": {"href": tg_href, "type": "attributemetadata", "mediaType": "application/json"},
+                "value": str(telegram_id),
+            }]
+
         return await _post(url, json_data=new_data)
 
     except Exception as e:
