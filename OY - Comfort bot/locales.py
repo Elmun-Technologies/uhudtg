@@ -73,8 +73,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "📭 Заказы не найдены.",
     },
     "no_shipments": {
-        "uz": "📭 Otgruzkalar topilmadi.",
-        "ru": "📭 Отгрузки не найдены.",
+        "uz": "📭 Buyurtmalar topilmadi.",
+        "ru": "📭 Заказы не найдены.",
     },
     "no_counterparty_for_list": {
         "uz": "❌ MoySklad da kontragent bog‘lanmagan. /start yoki 💰 Balans orqali telefonni tekshiring.",
@@ -89,8 +89,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": "🛒 Ваши заказы:",
     },
     "shipment_list_header": {
-        "uz": "📦 <b>Sizning otgruzkalaringiz</b> (MoySklad, jonli):",
-        "ru": "📦 <b>Ваши отгрузки</b> (МойСклад, онлайн):",
+        "uz": "🛒 <b>Sizning buyurtmalaringiz</b> (MoySklad, jonli):",
+        "ru": "🛒 <b>Ваши заказы</b> (МойСклад, онлайн):",
     },
     "order_item": {
         "uz": "📋 #{number}  •  🗓 {date}\n💰 {total} USD  •  {status}",
