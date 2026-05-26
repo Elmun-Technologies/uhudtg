@@ -162,10 +162,15 @@ async def _process_order(href: str) -> None:
     from locales import t
 
     date_str = fmt_datetime_display(order["moment"])
+    owner_name = (order.get("owner_name") or "").strip() or "—"
+    warehouse = (order.get("warehouse_name") or "").strip() or "—"
     text = t(
         "order_notification", lang,
         number=escape(doc_number_for_template(order["order_number"])),
         date=escape(date_str),
+        created_by=escape(owner_name),
+        responsible=escape(owner_name),
+        warehouse=escape(warehouse),
         name=escape(order["agent_name"] or ""),
         phone=escape(order["agent_phone"] or ""),
         items=_format_items(order["items"], lang),
