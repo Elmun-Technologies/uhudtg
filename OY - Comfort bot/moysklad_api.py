@@ -166,7 +166,7 @@ async def reverse_geocode(lat: float, lon: float) -> str:
     try:
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(8.0),
-            headers={"User-Agent": "ComfortTextileBot/1.0"},
+            headers={"User-Agent": "UhudAutoBot/1.0"},
         ) as client:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
@@ -229,6 +229,44 @@ def parse_payment(data: dict, payment_type: str) -> dict:
 async def fetch_counterparty(href: str) -> dict:
     """Fetch a counterparty (agent) by href."""
     return await _get(href)
+
+
+async def find_counterparty_by_phone(phone: str) -> dict | None:
+    """
+    Найти контрагента в МойСклад по телефону и вернуть его id + actualAddress.
+
+    Возвращает: {"id": str, "actualAddress": str} либо None если не найден.
+    Используется при регистрации, чтобы решить — нужно ли запрашивать адрес.
+    """
+    url = f"{MOYSKLAD_API}/entity/counterparty"
+    phone_digits = "".join(c for c in phone if c.isdigit())
+    if not phone_digits:
+        return None
+
+    suffix9 = phone_digits[-9:]
+
+    search_variants = list(dict.fromkeys([
+        f"+{phone_digits}",
+        phone_digits,
+        suffix9,
+    ]))
+
+    for search_term in search_variants:
+        try:
+            resp = await _get(url, params={"search": search_term, "limit": 50})
+            rows = resp.get("rows", [])
+            for row in rows:
+                row_phone_d = "".join(c for c in (row.get("phone") or "") if c.isdigit())
+                if row_phone_d and row_phone_d.endswith(suffix9):
+                    return {
+                        "id": row.get("id") or "",
+                        "actualAddress": (row.get("actualAddress") or "").strip(),
+                        "name": row.get("name") or "",
+                    }
+        except Exception as e:
+            logger.debug("Search '%s' failed: %s", search_term, e)
+
+    return None
 
 
 async def find_counterparty_id_by_phone(phone: str) -> str | None:

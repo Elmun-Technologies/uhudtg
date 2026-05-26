@@ -24,6 +24,20 @@ STRINGS: dict[str, dict[str, str]] = {
         "uz": "✅ Ro'yxatdan o'tish muvaffaqiyatli yakunlandi!",
         "ru": "✅ Регистрация успешно завершена!",
     },
+    "existing_client_found": {
+        "uz": "✅ Tizimda topildingiz! Siz allaqachon ro'yxatdan o'tgansiz.\n\nEndi yetkazib berish manzilingizni saqlab qo'yamiz.",
+        "ru": "✅ Вы найдены в системе! Вы уже зарегистрированы.\n\nТеперь сохраним ваш адрес доставки.",
+    },
+    "registration_ms_error": {
+        "uz": (
+            "⚠️ Hozircha MoySklad bilan bog'lanib bo'lmayapti. "
+            "Iltimos, biroz kutib /start ni qayta yuboring."
+        ),
+        "ru": (
+            "⚠️ Сейчас не удаётся связаться с МойСклад. "
+            "Подождите немного и отправьте /start снова."
+        ),
+    },
 
     # ── Main menu ──────────────────────────────────────────────────────────
     "main_menu": {
