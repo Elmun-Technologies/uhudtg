@@ -503,6 +503,9 @@ def parse_order(data: dict) -> dict:
     """
     agent = data.get("agent", {}) or {}
     agent_phone = agent.get("phone", "") or ""
+    owner = data.get("owner") or {}
+    owner_name = _person_name(owner)
+    warehouse_name = _embedded_name(data.get("store") or {})
     rate = data.get("rate")
 
     pos_block = data.get("positions") or {}
@@ -547,6 +550,8 @@ def parse_order(data: dict) -> dict:
         "total_original": total_sum_original,
         "currency": currency_name,
         "items": items,
+        "owner_name": owner_name,
+        "warehouse_name": warehouse_name,
     }
 
 

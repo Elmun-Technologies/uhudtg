@@ -153,24 +153,30 @@ STRINGS: dict[str, dict[str, str]] = {
     # ── MoySklad notifications ─────────────────────────────────────────────
     "order_notification": {
         "uz": (
-            "✅ <b>Buyurtma qabul qilindi!</b>\n\n"
-            "<b>📋</b> #{number}  •  <b>🗓 Sana va vaqt:</b> {date}\n\n"
-            "<b>🙍 Mijoz:</b> {name}\n"
-            "<b>📞 Telefon:</b> {phone}\n\n"
+            "🛒 <b>Yangi buyurtma!</b> #{number}\n"
+            "🗓 <b>{date}</b>\n"
+            "🙋‍♂️ <b>Yaratdi:</b> {created_by}\n"
+            "🧑‍💻 <b>Javobgar:</b> {responsible}\n"
+            "🏠 <b>Ombor:</b> {warehouse}\n\n"
+            "🙍 <b>Mijoz:</b> {name}\n"
+            "📞 <b>Telefon:</b> {phone}\n\n"
             "<b>📦 Mahsulotlar:</b>\n"
-            "{items}\n"
-            "<b>👉 Jami:</b> <b>{total} USD</b>\n\n"
-            "<b>Joriy balans:</b> <b>{balance} USD</b>"
+            "{items}\n\n"
+            "👉 <b>Jami:</b> <b>{total} USD</b>\n"
+            "💰 <b>Joriy balans:</b> <b>{balance} USD</b>"
         ),
         "ru": (
-            "✅ <b>Заказ принят!</b>\n\n"
-            "<b>📋</b> #{number}  •  <b>🗓 Дата и время:</b> {date}\n\n"
-            "<b>🙍 Клиент:</b> {name}\n"
-            "<b>📞 Телефон:</b> {phone}\n\n"
+            "🛒 <b>Новый заказ!</b> #{number}\n"
+            "🗓 <b>{date}</b>\n"
+            "🙋‍♂️ <b>Создал:</b> {created_by}\n"
+            "🧑‍💻 <b>Ответственный:</b> {responsible}\n"
+            "🏠 <b>Склад:</b> {warehouse}\n\n"
+            "🙍 <b>Клиент:</b> {name}\n"
+            "📞 <b>Телефон:</b> {phone}\n\n"
             "<b>📦 Товары:</b>\n"
-            "{items}\n"
-            "<b>👉 Итого:</b> <b>{total} USD</b>\n\n"
-            "<b>Текущий баланс:</b> <b>{balance} USD</b>"
+            "{items}\n\n"
+            "👉 <b>Итого:</b> <b>{total} USD</b>\n"
+            "💰 <b>Текущий баланс:</b> <b>{balance} USD</b>"
         ),
     },
     "shipment_notification": {
