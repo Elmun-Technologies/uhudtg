@@ -168,6 +168,7 @@ def generate_shipment_pdf(
     balance_before: float,
     balance_after: float,
     seller_name: str = "",
+    header_status: str = "YUBORILDI",
 ) -> bytes:
     """
     Generate a shipment PDF and return it as bytes.
@@ -211,7 +212,7 @@ def generate_shipment_pdf(
         [
             [Paragraph(_esc("Comfort Textile"), styles["company"])],
             [Paragraph(_esc(shipment_number), styles["order_num"])],
-            [Paragraph("YUBORILDI", styles["status"])],
+            [Paragraph(_esc(header_status), styles["status"])],
         ],
         colWidths=[text_col_w],
     )

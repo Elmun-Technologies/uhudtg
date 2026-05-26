@@ -138,94 +138,94 @@ async def _process_order(href: str) -> None:
     raw   = await ms.fetch_entity(href)
     order = ms.parse_order(raw)
 
-    user       = await db.get_user_by_phone(order["agent_phone"])
-    telegram_id = user["telegram_id"] if user else None
-    balance = float(user["balance_usd"]) if user and user.get("balance_usd") is not None else 0.0
-
-    if telegram_id and order["agent_id"]:
-        await db.save_moysklad_counterparty_id(telegram_id, order["agent_id"])
-
-    logger.info(
-        "Order %s (MoySklad only, DB history not stored), phone=%s",
-        order["order_number"],
-        order["agent_phone"],
-    )
-
-
-async def _process_shipment(href: str) -> None:
-    raw      = await ms.fetch_entity(href)
-    shipment = ms.parse_demand(raw)
-    await ms.enrich_demand_from_moysklad(raw, shipment)
-
-    user        = await db.get_user_by_phone(shipment["agent_phone"])
+    user        = await db.get_user_by_phone(order["agent_phone"])
     telegram_id = user["telegram_id"] if user else None
     lang        = user["language"]    if user else "uz"
 
     balance_after = 0.0
+    if order["agent_id"]:
+        try:
+            balance_after = await ms.fetch_counterparty_balance(order["agent_id"])
+        except Exception as e:
+            logger.error("Order balance fetch failed for cp=%s: %s", order["agent_id"], e)
+
+    if telegram_id and order["agent_id"]:
+        await db.save_moysklad_counterparty_id(telegram_id, order["agent_id"])
+
+    balance_before = balance_after + order["total_usd"]
+
+    if not telegram_id or not _bot:
+        logger.info("Order %s; no TG user for phone '%s'",
+                    order["order_number"], order["agent_phone"])
+        return
+
+    from locales import t
+
+    date_str = fmt_datetime_display(order["moment"])
+    text = t(
+        "order_notification", lang,
+        number=escape(doc_number_for_template(order["order_number"])),
+        date=escape(date_str),
+        name=escape(order["agent_name"] or ""),
+        phone=escape(order["agent_phone"] or ""),
+        items=_format_items(order["items"], lang),
+        total=fmt_usd(order["total_usd"]),
+        balance=fmt_usd(balance_after),
+    )
+    await _bot.send_message(telegram_id, text)
+    try:
+        pdf_bytes = generate_shipment_pdf(
+            shipment_number=order["order_number"],
+            moment=date_str,
+            status=order.get("status") or "—",
+            customer_name=order["agent_name"],
+            customer_phone=order["agent_phone"],
+            seller_name="",
+            items=order["items"],
+            total_usd=order["total_usd"],
+            balance_before=balance_before,
+            balance_after=balance_after,
+            header_status="QABUL QILINDI",
+        )
+        pdf_file = BufferedInputFile(
+            pdf_bytes,
+            filename=f"Order_{order['order_number']}.pdf",
+        )
+        await _bot.send_document(telegram_id, document=pdf_file)
+    except Exception as e:
+        logger.error(
+            "Order PDF send failed for user %s, order %s: %s",
+            telegram_id,
+            order["order_number"],
+            e,
+        )
+    logger.info("Order notification → user %s, order %s, balance %.2f",
+                telegram_id, order["order_number"], balance_after)
+
+
+async def _process_shipment(href: str) -> None:
+    """
+    Otgruzka (demand) — mijozga bildirishnoma YUBORILMAYDI.
+    Faqat MoySklad bilan bog'lanish (counterparty link) va balansni yangilash uchun.
+    Mijoz uchun bildirishnoma faqat customerorder (zakaz) yaratilganda yuboriladi.
+    """
+    raw      = await ms.fetch_entity(href)
+    shipment = ms.parse_demand(raw)
+
+    user        = await db.get_user_by_phone(shipment["agent_phone"])
+    telegram_id = user["telegram_id"] if user else None
+
     if shipment["agent_id"]:
         try:
-            balance_after = await ms.fetch_counterparty_balance(shipment["agent_id"])
+            await ms.fetch_counterparty_balance(shipment["agent_id"])
         except Exception as e:
             logger.error("Shipment balance fetch failed for cp=%s: %s", shipment["agent_id"], e)
 
     if telegram_id and shipment["agent_id"]:
         await db.save_moysklad_counterparty_id(telegram_id, shipment["agent_id"])
 
-    balance_before = balance_after + shipment["total_usd"]
-
-    if not telegram_id or not _bot:
-        logger.info("Shipment %s saved; no TG user for phone %s",
-                    shipment["shipment_number"], shipment["agent_phone"])
-        return
-
-    from locales import t
-
-    date_str = fmt_datetime_display(shipment["moment"])
-    owner_name = (shipment.get("owner_name") or "").strip() or "—"
-    seller_disp = (shipment.get("seller_name") or "").strip() or "—"
-    warehouse = (shipment.get("warehouse_name") or "").strip() or "—"
-    text = t(
-        "shipment_notification", lang,
-        number=escape(doc_number_for_template(shipment["shipment_number"])),
-        date=escape(date_str),
-        created_by=escape(owner_name),
-        responsible=escape(owner_name),
-        seller=escape(seller_disp),
-        name=escape(shipment["agent_name"] or ""),
-        phone=escape(shipment["agent_phone"] or ""),
-        warehouse=escape(warehouse),
-        items=_format_items(shipment["items"], lang),
-        total=fmt_usd(shipment["total_usd"]),
-        balance=fmt_usd(balance_after),
-    )
-    await _bot.send_message(telegram_id, text)
-    try:
-        pdf_bytes = generate_shipment_pdf(
-            shipment_number=shipment["shipment_number"],
-            moment=date_str,
-            status=shipment["status"],
-            customer_name=shipment["agent_name"],
-            customer_phone=shipment["agent_phone"],
-            seller_name=seller_disp,
-            items=shipment["items"],
-            total_usd=shipment["total_usd"],
-            balance_before=balance_before,
-            balance_after=balance_after,
-        )
-        pdf_file = BufferedInputFile(
-            pdf_bytes,
-            filename=f"Shipment_{shipment['shipment_number']}.pdf",
-        )
-        await _bot.send_document(telegram_id, document=pdf_file)
-    except Exception as e:
-        logger.error(
-            "Shipment PDF send failed for user %s, shipment %s: %s",
-            telegram_id,
-            shipment["shipment_number"],
-            e,
-        )
-    logger.info("Shipment notification → user %s, shipment %s, balance %.2f",
-                telegram_id, shipment["shipment_number"], balance_after)
+    logger.info("Shipment %s processed (no customer notification), phone=%s",
+                shipment["shipment_number"], shipment["agent_phone"])
 
 
 async def _process_payment(href: str, payment_type: str) -> None:
