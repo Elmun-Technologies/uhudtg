@@ -4,11 +4,11 @@ STRINGS: dict[str, dict[str, str]] = {
     # ── Registration ───────────────────────────────────────────────────────
     "welcome_new": {
         "uz": (
-            "👋 Uhud Textile botiga xush kelibsiz!\n\n"
+            "👋 Uhud Auto botiga xush kelibsiz!\n\n"
             "Ro'yxatdan o'tish uchun telefon raqamingizni ulashing."
         ),
         "ru": (
-            "👋 Добро пожаловать в бот Uhud Textile!\n\n"
+            "👋 Добро пожаловать в бот Uhud Auto!\n\n"
             "Поделитесь номером телефона для регистрации."
         ),
     },
