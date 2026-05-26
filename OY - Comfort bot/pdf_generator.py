@@ -210,7 +210,7 @@ def generate_shipment_pdf(
 
     header_right_stack = Table(
         [
-            [Paragraph(_esc("Comfort Textile"), styles["company"])],
+            [Paragraph(_esc("Uhud Textile"), styles["company"])],
             [Paragraph(_esc(shipment_number), styles["order_num"])],
             [Paragraph(_esc(header_status), styles["status"])],
         ],
@@ -468,7 +468,7 @@ def generate_period_report_pdf(
         "col_qty":    ("Miqdor",                   "Кол-во"),
         "col_uom":    ("Birlik",                   "Ед."),
         "col_price":  ("Narx",                     "Цена"),
-        "footer":     ("Comfort Textile",          "Comfort Textile"),
+        "footer":     ("Uhud Textile",             "Uhud Textile"),
         "empty":      ("(yo‘q)",                   "(нет)"),
         "default_unit": ("dona",                   "шт"),
     }
@@ -511,7 +511,7 @@ def generate_period_report_pdf(
 
     header_right_stack = Table(
         [
-            [Paragraph(_esc("Comfort Textile"), styles["company"])],
+            [Paragraph(_esc("Uhud Textile"), styles["company"])],
             [Paragraph(_esc(f"{t('title')}: {period_label}"), styles["order_num"])],
             [Paragraph(_esc(f"{date_from} — {date_to}"), styles["status"])],
         ],
