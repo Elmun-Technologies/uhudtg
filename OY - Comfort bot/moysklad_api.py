@@ -67,7 +67,7 @@ async def _shared_http() -> httpx.AsyncClient:
         if _http_client is None or _http_client.is_closed:
             _http_client = httpx.AsyncClient(
                 timeout=httpx.Timeout(25.0, connect=10.0),
-                limits=httpx.Limits(max_keepalive_connections=24, max_connections=48),
+                limits=httpx.Limits(max_keepalive_connections=8, max_connections=12),
                 headers=_headers(),
             )
         return _http_client
@@ -84,25 +84,98 @@ async def close_moysklad_http() -> None:
             _http_client = None
 
 
-async def _get(url: str, params: dict | None = None) -> dict:
+# ── Global rate limiting + retry ─────────────────────────────────────────────
+# MoySklad cheklovi: ~45 so‘rov / 3 sekund va bir vaqtdagi ulanishlar soni
+# cheklangan. Telegram'da bir necha mijoz bir zumda /start bossa (har biri
+# 3–5 ta API so‘rov), throttle qilinmagan portlash MoySklad himoyasini ishga
+# tushiradi (HTTP 403 kod=1073/1074 yoki 429), ba'zan API vaqtincha bloklanadi.
+# Shuning uchun: global concurrency cheklanadi, so‘rovlar orasiga minimal
+# interval qo‘yiladi, throttle javoblari exponential backoff bilan qaytariladi.
+_MS_MAX_CONCURRENCY = 4
+_MS_MIN_INTERVAL = 0.08  # so‘rov boshlanishlari orasidagi minimal vaqt (~12 req/s)
+_MS_MAX_RETRIES = 4
+
+_ms_semaphore: asyncio.Semaphore | None = None
+_ms_rate_lock: asyncio.Lock | None = None
+_ms_last_request_ts: float = 0.0
+
+
+def _ensure_throttle() -> tuple[asyncio.Semaphore, asyncio.Lock]:
+    global _ms_semaphore, _ms_rate_lock
+    if _ms_semaphore is None:
+        _ms_semaphore = asyncio.Semaphore(_MS_MAX_CONCURRENCY)
+    if _ms_rate_lock is None:
+        _ms_rate_lock = asyncio.Lock()
+    return _ms_semaphore, _ms_rate_lock
+
+
+async def _pace() -> None:
+    """Global ravishda so‘rovlar orasida _MS_MIN_INTERVAL ni ta'minlaydi."""
+    global _ms_last_request_ts
+    _, rate_lock = _ensure_throttle()
+    async with rate_lock:
+        loop = asyncio.get_running_loop()
+        now = loop.time()
+        wait = _ms_last_request_ts + _MS_MIN_INTERVAL - now
+        if wait > 0:
+            await asyncio.sleep(wait)
+            now = loop.time()
+        _ms_last_request_ts = now
+
+
+def _is_throttle_response(exc: httpx.HTTPStatusError) -> bool:
+    """True — agar xato vaqtinchalik throttle bo‘lsa (qayta urinish xavfsiz)."""
+    status = exc.response.status_code
+    if status == 429 or 500 <= status < 600:
+        return True
+    if status == 403:
+        # MoySklad rate/ulanish limitida ham 403 qaytaradi (kod 1073/1074).
+        # 1061 (API kirishi yo‘q) — qayta urinilmaydi, sozlama muammosi.
+        try:
+            errors = exc.response.json().get("errors", [])
+            codes = {e.get("code") for e in errors}
+            return bool(codes & {1073, 1074})
+        except Exception:
+            return False
+    return False
+
+
+async def _request(method: str, url: str, *, params=None, json_data=None) -> dict:
+    sem, _ = _ensure_throttle()
     client = await _shared_http()
-    resp = await client.get(url, params=params)
-    resp.raise_for_status()
-    return resp.json()
+    last_exc: Exception | None = None
+    for attempt in range(_MS_MAX_RETRIES):
+        async with sem:
+            await _pace()
+            resp = await client.request(method, url, params=params, json=json_data)
+        try:
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as exc:
+            last_exc = exc
+            if not _is_throttle_response(exc) or attempt == _MS_MAX_RETRIES - 1:
+                raise
+            backoff = 2 ** attempt  # 1, 2, 4, 8 sekund
+            logger.warning(
+                "MoySklad throttled (%s), retry %d/%d after %ds: %s",
+                exc.response.status_code, attempt + 1, _MS_MAX_RETRIES, backoff, url,
+            )
+            await asyncio.sleep(backoff)
+    if last_exc:
+        raise last_exc
+    raise RuntimeError("unreachable")
+
+
+async def _get(url: str, params: dict | None = None) -> dict:
+    return await _request("GET", url, params=params)
 
 
 async def _post(url: str, json_data: dict | None = None) -> dict:
-    client = await _shared_http()
-    resp = await client.post(url, json=json_data)
-    resp.raise_for_status()
-    return resp.json()
+    return await _request("POST", url, json_data=json_data)
 
 
 async def _put(url: str, json_data: dict | None = None) -> dict:
-    client = await _shared_http()
-    resp = await client.put(url, json=json_data)
-    resp.raise_for_status()
-    return resp.json()
+    return await _request("PUT", url, json_data=json_data)
 
 
 async def sync_counterparty(name: str, phone: str, telegram_id: int) -> dict:
