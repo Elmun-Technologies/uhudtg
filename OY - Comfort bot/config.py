@@ -9,6 +9,13 @@ load_dotenv()
 
 BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
 MOYSKLAD_TOKEN: str = os.getenv("MOYSKLAD_TOKEN", "")
+# UUID maxsus atributi "Telegram ID" — yangi kontragentni yaratayotganda
+# qaysi atributga telegram_id yoziladi. Akkauntga ko'ra o'zgaradi:
+# `docker compose exec bot python list_attributes.py` orqali topish mumkin.
+# Bo'sh qoldirilsa — yangi kontragent yaratish atributsiz amalga oshadi.
+MOYSKLAD_TG_ATTR_UUID: str = os.getenv(
+    "MOYSKLAD_TG_ATTR_UUID", "0db9b9e1-bd23-11ef-0a80-045400574ee9"
+)
 WEBHOOK_HOST: str = os.getenv("WEBHOOK_HOST", "")
 WEBHOOK_PATH: str = os.getenv("WEBHOOK_PATH", "/moysklad/webhook")
 WEBHOOK_PORT: int = int(os.getenv("WEBHOOK_PORT", "8080"))
