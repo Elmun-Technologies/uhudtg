@@ -4,7 +4,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import httpx
-from config import MOYSKLAD_API, MOYSKLAD_ENRICH_CONCURRENCY, MOYSKLAD_TOKEN, MS_MOMENT_LOG
+from config import (
+    MOYSKLAD_API,
+    MOYSKLAD_ENRICH_CONCURRENCY,
+    MOYSKLAD_TG_ATTR_UUID,
+    MOYSKLAD_TOKEN,
+    MS_MOMENT_LOG,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -185,18 +191,13 @@ async def sync_counterparty(name: str, phone: str, telegram_id: int) -> dict:
     ВАЖНО: если контрагент уже существует — обновляем ТОЛЬКО атрибут telegram_id,
     не трогая имя и телефон (они управляются менеджером в МойСклад).
     Если контрагент не найден — создаём нового.
+
+    Telegram ID атрибут — кастомный атрибут в МойСклад. UUID меняется от
+    аккаунта к аккаунту (см. config.MOYSKLAD_TG_ATTR_UUID). Если атрибут
+    не существует в этом аккаунте (404), контрагент создаётся БЕЗ атрибута —
+    регистрация клиента не должна срываться из-за отсутствия атрибута.
     """
     url = f"{MOYSKLAD_API}/entity/counterparty"
-
-    # Атрибут Telegram ID (кастомный атрибут в МойСклад)
-    tg_attribute = {
-        "meta": {
-            "href": f"{MOYSKLAD_API}/entity/counterparty/metadata/attributes/8666aeb7-192b-11f1-0a80-00f20005e1af",
-            "type": "attributemetadata",
-            "mediaType": "application/json",
-        },
-        "value": str(telegram_id),
-    }
 
     try:
         # Prefer robust multi-format search to avoid duplicate counterparties.
@@ -209,14 +210,36 @@ async def sync_counterparty(name: str, phone: str, telegram_id: int) -> dict:
             )
             return matched
 
-        # Контрагент не найден — создаём нового
         logger.info("Counterparty not found for phone %s, creating new", phone)
-        new_data = {
-            "name": name,
-            "phone": phone,
-            "attributes": [tg_attribute],
-        }
-        return await _post(url, json_data=new_data)
+        base_data: dict = {"name": name, "phone": phone}
+
+        # Birinchi urinish — Telegram ID atributi bilan
+        if MOYSKLAD_TG_ATTR_UUID:
+            tg_attribute = {
+                "meta": {
+                    "href": (
+                        f"{MOYSKLAD_API}/entity/counterparty/metadata/"
+                        f"attributes/{MOYSKLAD_TG_ATTR_UUID}"
+                    ),
+                    "type": "attributemetadata",
+                    "mediaType": "application/json",
+                },
+                "value": str(telegram_id),
+            }
+            try:
+                return await _post(url, json_data={**base_data, "attributes": [tg_attribute]})
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code != 404:
+                    raise
+                logger.warning(
+                    "Telegram ID atribut topilmadi (UUID=%s, 404). "
+                    "Kontragent atributsiz yaratiladi. config.py / .env'da "
+                    "MOYSKLAD_TG_ATTR_UUID ni to'g'rilash kerak.",
+                    MOYSKLAD_TG_ATTR_UUID,
+                )
+
+        # Fallback: atributsiz yaratish — mijoz baribir ro'yxatga olinadi
+        return await _post(url, json_data=base_data)
 
     except Exception as e:
         logger.error("sync_counterparty error for phone %s: %s", phone, e)
