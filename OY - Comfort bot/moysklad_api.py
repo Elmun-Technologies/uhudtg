@@ -91,8 +91,8 @@ async def close_moysklad_http() -> None:
 # tushiradi (HTTP 403 kod=1073/1074 yoki 429), ba'zan API vaqtincha bloklanadi.
 # Shuning uchun: global concurrency cheklanadi, so‘rovlar orasiga minimal
 # interval qo‘yiladi, throttle javoblari exponential backoff bilan qaytariladi.
-_MS_MAX_CONCURRENCY = 4
-_MS_MIN_INTERVAL = 0.08  # so‘rov boshlanishlari orasidagi minimal vaqt (~12 req/s)
+_MS_MAX_CONCURRENCY = 3
+_MS_MIN_INTERVAL = 0.10  # so‘rov boshlanishlari orasidagi minimal vaqt (~10 req/s)
 _MS_MAX_RETRIES = 4
 
 _ms_semaphore: asyncio.Semaphore | None = None
@@ -736,6 +736,61 @@ def _demand_seller_name(data: dict, owner_name: str) -> str:
     return (owner_name or "").strip()
 
 
+# ── Employee fetch cache ─────────────────────────────────────────────────────
+# Bir buyurtmalar ro'yxati yuklanganda har bir demand'ning owner'i bir xil
+# bo'lishi mumkin (masalan "Тохир" 50 ta otgruzkani yaratgan). Keshsiz biz
+# 50 ta bir xil GET /entity/employee/{id} so'rovini yuboramiz. Agar token
+# egasining roli boshqa xodimlarni ko'rishga ruxsat bermasa — 50 ta 403
+# javob keladi, bu esa MoySklad'ning rate-limit himoyasini ishga tushiradi
+# (429), oqibatda boshqa amallar (manzil saqlash, balans) ham yiqiladi.
+#
+# Yechim: muvaffaqiyatli javoblarni ham, 403'larni ham keshlaymiz. Bir
+# employee uchun ko'pi bilan bitta so'rov yuboriladi (sessiya davomida).
+_employee_cache: dict[str, dict | None] = {}
+_employee_cache_lock: asyncio.Lock | None = None
+_EMPLOYEE_CACHE_MAX = 500
+
+
+async def _fetch_employee_safe(href: str) -> dict | None:
+    """Employee'ni keshdan oladi yoki MoySklad'dan yuklaydi.
+
+    Returns:
+        dict — muvaffaqiyatli yuklangan employee
+        None — 403 yoki boshqa permanent xato (qayta urinmaymiz)
+    """
+    global _employee_cache_lock
+    if _employee_cache_lock is None:
+        _employee_cache_lock = asyncio.Lock()
+
+    async with _employee_cache_lock:
+        if href in _employee_cache:
+            return _employee_cache[href]
+
+    try:
+        emp = await _get(href)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 403:
+            # Tokenning xodim ma'lumotini ko'rishga ruxsati yo'q —
+            # keshga "yo'q" deb qo'yamiz, boshqa demand'lar uchun
+            # qayta urinmaymiz.
+            async with _employee_cache_lock:
+                if len(_employee_cache) < _EMPLOYEE_CACHE_MAX:
+                    _employee_cache[href] = None
+            logger.warning(
+                "Employee fetch forbidden (403) — cached as inaccessible: %s", href,
+            )
+            return None
+        raise
+    except Exception as e:
+        logger.warning("Employee fetch failed (transient, not cached) %s: %s", href, e)
+        return None
+
+    async with _employee_cache_lock:
+        if len(_employee_cache) < _EMPLOYEE_CACHE_MAX:
+            _employee_cache[href] = emp
+    return emp
+
+
 async def _enrich_seller_from_employee_attributes(raw: dict, shipment: dict) -> None:
     """Если в значении employee только meta — подтянуть ФИО по href (список / PDF)."""
     attrs = raw.get("attributes") or []
@@ -761,14 +816,13 @@ async def _enrich_seller_from_employee_attributes(raw: dict, shipment: dict) -> 
         href = _employee_href_from_attribute(a)
         if not href:
             continue
-        try:
-            emp = await _get(href)
-            nm = _person_name(emp)
-            if nm:
-                shipment["seller_name"] = nm
-                return
-        except Exception as e:
-            logger.debug("demand seller attr employee fetch href=%s: %s", href, e)
+        emp = await _fetch_employee_safe(href)
+        if emp is None:
+            continue
+        nm = _person_name(emp)
+        if nm:
+            shipment["seller_name"] = nm
+            return
 
 
 async def enrich_demand_from_moysklad(raw: dict, shipment: dict) -> None:
@@ -782,14 +836,12 @@ async def enrich_demand_from_moysklad(raw: dict, shipment: dict) -> None:
     if not oname:
         href = (owner.get("meta") or {}).get("href")
         if href:
-            try:
-                emp = await _get(href)
+            emp = await _fetch_employee_safe(href)
+            if emp is not None:
                 oname = _person_name(emp)
                 if oname:
                     shipment["owner_name"] = oname
                     raw["owner"] = {**owner, **{k: v for k, v in emp.items() if k != "meta"}}
-            except Exception as e:
-                logger.warning("demand owner expand fetch failed href=%s: %s", href, e)
     elif not (shipment.get("owner_name") or "").strip():
         shipment["owner_name"] = oname
 
