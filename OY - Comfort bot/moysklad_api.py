@@ -327,40 +327,108 @@ async def fetch_counterparty(href: str) -> dict:
     return await _get(href)
 
 
+def _phone_variants(phone: str) -> tuple[list[str], str, str]:
+    """Telefon raqamining qidiruv variantlari.
+
+    Returns:
+        (search_variants, suffix9, suffix7) — variantlar ro'yxati va oxirgi
+        9 va 7 raqamlari (moslik tekshirish uchun).
+    """
+    phone_digits = "".join(c for c in phone if c.isdigit())
+    if not phone_digits:
+        return [], "", ""
+
+    suffix9 = phone_digits[-9:] if len(phone_digits) >= 9 else phone_digits
+    suffix7 = phone_digits[-7:] if len(phone_digits) >= 7 else phone_digits
+
+    # Mumkin bo'lgan barcha formatlar — MoySklad'ning search'i substring
+    # qidiradi, shuning uchun ko'p variant berish topilish ehtimolini oshiradi.
+    variants = [
+        f"+{phone_digits}",       # +998901234567
+        phone_digits,              # 998901234567
+        suffix9,                   # 901234567
+        f"+998{suffix9}",          # +998901234567 (yana, lekin uzbek prefiks bilan)
+    ]
+    # Uzunligi 12 (998... ko'rinishida) bo'lsa — local format (8-bilan) ham sinab ko'ramiz
+    if len(phone_digits) == 12 and phone_digits.startswith("998"):
+        variants.append(f"8{suffix9}")  # 8901234567 (eski formati)
+
+    # Dublikatlarni olib tashlash, tartibni saqlash
+    seen: set[str] = set()
+    unique: list[str] = []
+    for v in variants:
+        if v and v not in seen:
+            seen.add(v)
+            unique.append(v)
+    return unique, suffix9, suffix7
+
+
 async def find_counterparty_by_phone(phone: str) -> dict | None:
     """
     Найти контрагента в МойСклад по телефону и вернуть его id + actualAddress.
 
-    Возвращает: {"id": str, "actualAddress": str} либо None если не найден.
-    Используется при регистрации, чтобы решить — нужно ли запрашивать адрес.
+    Strategiya:
+      1. Kengaytirilgan qidiruv variantlari (5 ta format)
+      2. Topilgan natijalardan oxirgi 9 raqam aniq mos kelsa → kuchli moslik
+      3. Topilmasa, oxirgi 7 raqam mos kelsa → kuchsiz moslik (warning bilan)
+      4. Aks holda None
+
+    Bu funksiya yangi mijoz ro'yxatidan o'tayotganda dublikat yaratilmasligi
+    uchun qattiq tekshiradi.
     """
     url = f"{MOYSKLAD_API}/entity/counterparty"
-    phone_digits = "".join(c for c in phone if c.isdigit())
-    if not phone_digits:
+    search_variants, suffix9, suffix7 = _phone_variants(phone)
+    if not search_variants:
         return None
 
-    suffix9 = phone_digits[-9:]
-
-    search_variants = list(dict.fromkeys([
-        f"+{phone_digits}",
-        phone_digits,
-        suffix9,
-    ]))
+    weak_match: dict | None = None  # suffix7 mos kelsa, lekin suffix9 mos kelmasa
+    seen_ids: set[str] = set()
 
     for search_term in search_variants:
         try:
             resp = await _get(url, params={"search": search_term, "limit": 50})
             rows = resp.get("rows", [])
             for row in rows:
+                cp_id = row.get("id") or ""
+                if cp_id in seen_ids:
+                    continue
+                seen_ids.add(cp_id)
                 row_phone_d = "".join(c for c in (row.get("phone") or "") if c.isdigit())
-                if row_phone_d and row_phone_d.endswith(suffix9):
+                if not row_phone_d:
+                    continue
+                if suffix9 and len(suffix9) >= 9 and row_phone_d.endswith(suffix9):
+                    # Kuchli moslik — darrov qaytaramiz
                     return {
-                        "id": row.get("id") or "",
+                        "id": cp_id,
                         "actualAddress": (row.get("actualAddress") or "").strip(),
                         "name": row.get("name") or "",
                     }
+                if (
+                    weak_match is None
+                    and suffix7
+                    and len(suffix7) >= 7
+                    and row_phone_d.endswith(suffix7)
+                ):
+                    weak_match = {
+                        "id": cp_id,
+                        "actualAddress": (row.get("actualAddress") or "").strip(),
+                        "name": row.get("name") or "",
+                        "row_phone": row.get("phone") or "",
+                    }
         except Exception as e:
             logger.debug("Search '%s' failed: %s", search_term, e)
+
+    if weak_match is not None:
+        logger.warning(
+            "Counterparty found by WEAK match (last 7 digits): name='%s', "
+            "moysklad_phone='%s', searched_phone='%s'. Linking to existing to avoid duplicate.",
+            weak_match["name"], weak_match["row_phone"], phone,
+        )
+        return {
+            "id": weak_match["id"],
+            "actualAddress": weak_match["actualAddress"],
+            "name": weak_match["name"],
+        }
 
     return None
 
@@ -369,9 +437,25 @@ async def find_counterparty_id_by_phone(phone: str) -> str | None:
     """
     Найти ID контрагента в МойСклад по номеру телефона.
 
-    Использует те же поисковые запросы что и sync_counterparty —
-    гарантированно работает, т.к. sync_counterparty уже находил контрагентов.
+    Wrapper around find_counterparty_by_phone() — returns only the id.
+    Maintains backward compatibility for callers that need just the id.
     """
+    cp = await find_counterparty_by_phone(phone)
+    if cp:
+        cp_id = cp.get("id") or ""
+        if cp_id:
+            logger.info(
+                "find_counterparty_id_by_phone: matched '%s' (id=%s) for phone=%s",
+                cp.get("name") or "—", cp_id, phone,
+            )
+            return cp_id
+    logger.warning("find_counterparty_id_by_phone: NOT FOUND for phone=%s", phone)
+    return None
+
+
+# Eski (legacy) qidirish funksiyasi — endi find_counterparty_by_phone'dan o'tadi
+async def _legacy_find_counterparty_id_by_phone(phone: str) -> str | None:
+    """Eski mantiq, faqat zaxira sifatida saqlanadi (test/debug uchun)."""
     url = f"{MOYSKLAD_API}/entity/counterparty"
     phone_digits = "".join(c for c in phone if c.isdigit())
     if not phone_digits:
