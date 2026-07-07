@@ -1,0 +1,46 @@
+# =============================================================================
+#  Dokploy deployment compose (use THIS file on Dokploy, not docker-compose.yml)
+#
+#  Dokploy already runs Traefik as the reverse proxy and owns ports 80/443 and
+#  TLS (Let's Encrypt). So here we:
+#    • DO NOT run Caddy
+#    • DO NOT publish host ports
+#    • attach the bot to the external `dokploy-network` so Traefik can reach it
+#
+#  In the Dokploy UI for this Compose app:
+#    1) General → Compose Path = ./docker-compose.dokploy.yml
+#    2) Environment → paste all vars from .env.example (real values)
+#       (Dokploy writes them to a .env file next to this compose → env_file works)
+#    3) Domains → Add:
+#         Host          = your domain (e.g. bot.example.com)
+#         Path          = /
+#         Container Port = 8080
+#         HTTPS          = on  (Let's Encrypt)
+#         Service        = bot
+#       Dokploy injects the Traefik labels automatically — no labels needed here.
+# =============================================================================
+services:
+  bot:
+    build:
+      context: "./OY - Comfort bot"
+    restart: unless-stopped
+    env_file: .env
+    # Explicit public DNS — some Docker networks can't resolve
+    # api.moysklad.ru / api.telegram.org via the host resolver.
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    expose:
+      - "8080"           # internal only; Traefik routes to this port
+    volumes:
+      - bot_data:/data   # SQLite persists here (survives redeploys)
+      - ./assets:/app/assets
+    networks:
+      - dokploy-network
+
+volumes:
+  bot_data:
+
+networks:
+  dokploy-network:
+    external: true
