@@ -598,13 +598,30 @@ async def _fetch_agent_documents_paginated(
             break
         scanned += len(batch)
         parsed: list[tuple[dict, dict]] = []
+        # Sana filtri boyitishdan OLDIN qo'llanadi: aks holda `moment_lo`..`moment_hi`
+        # oralig'idan tashqaridagi hujjatlar ham bittalab yuklanib, keyin tashlab
+        # yuborilardi (90 kunlik tarix uchun butun tarixni yuklash degani).
+        lo_key = _moment_cmp_key(moment_lo) if moment_lo else ""
+        range_exhausted = False
         for row in batch:
             try:
                 p = parse_row(row)
             except Exception as ex:
                 logger.debug("parse %s row skip: %s", entity, ex)
                 continue
+            # `order=moment,desc` — birinchi eski hujjatdan keyin qolganlari ham
+            # eski, shuning uchun sahifalashni to'xtatamiz.
+            k = _moment_cmp_key(p.get("moment") or "")
+            if lo_key and k and k < lo_key:
+                range_exhausted = True
+                break
+            if (moment_lo or moment_hi) and not _moment_in_closed_range(
+                p.get("moment") or "", moment_lo, moment_hi
+            ):
+                continue
             parsed.append((row, p))
+            if result_limit is not None and len(collected) + len(parsed) >= result_limit:
+                break
 
         if enrich_demand_row and entity == "demand" and parsed:
             sem = asyncio.Semaphore(MOYSKLAD_ENRICH_CONCURRENCY)
@@ -619,15 +636,12 @@ async def _fetch_agent_documents_paginated(
             await asyncio.gather(*(_enrich_one(r, p) for r, p in parsed))
 
         for row, p in parsed:
-            if moment_lo or moment_hi:
-                if not _moment_in_closed_range(p.get("moment") or "", moment_lo, moment_hi):
-                    continue
             collected.append(p)
             if result_limit is not None and len(collected) >= result_limit:
                 break
         if result_limit is not None and len(collected) >= result_limit:
             break
-        if len(batch) < page:
+        if range_exhausted or len(batch) < page:
             break
         offset += page
     return collected
