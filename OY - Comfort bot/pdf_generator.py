@@ -423,6 +423,279 @@ def _fmt_qty(value: float) -> str:
     return s or "0"
 
 
+def generate_debt_notice_pdf(
+    *,
+    lang: str,
+    date_label: str,
+    customer_name: str,
+    customer_phone: str,
+    debt_amount: float,
+    shipments: list[dict],
+    period_from: str,
+    period_to: str,
+    company_phone: str = "",
+) -> bytes:
+    """Qarzdorlikni to'lash haqida eslatma — qarz summasi + so'nggi otgruzkalar."""
+    is_uz = (lang or "uz").lower().startswith("uz")
+    L = {
+        "title":      ("Qarzdorlik bo‘yicha eslatma", "Напоминание о задолженности"),
+        "customer":   ("Mijoz",                  "Клиент"),
+        "name":       ("Ism",                    "ФИО"),
+        "phone":      ("Telefon",                "Телефон"),
+        "debt_box":   ("Joriy qarzdorlik",       "Текущая задолженность"),
+        "debt_sum":   ("To‘lanishi kerak",       "К оплате"),
+        "as_of":      ("Holat sanasi",           "На дату"),
+        "docs_h":     ("So‘nggi otgruzkalar",    "Последние отгрузки"),
+        "period":     ("Davr",                   "Период"),
+        "col_n":      ("№",                      "№"),
+        "col_date":   ("Sana",                   "Дата"),
+        "col_doc":    ("Hujjat",                 "Документ"),
+        "col_total":  ("Summa",                  "Сумма"),
+        "no_docs":    ("Bu davrda otgruzka yo‘q", "За этот период отгрузок нет"),
+        "docs_total": ("Otgruzkalar jami",       "Итого отгрузок"),
+        "note":       (
+            "Iltimos, qarzdorlikni imkon qadar tezroq to‘lab qo‘yishingizni so‘raymiz. "
+            "Summa bo‘yicha savollaringiz bo‘lsa, biz bilan bog‘laning.",
+            "Просим погасить задолженность в ближайшее время. "
+            "Если у вас есть вопросы по сумме — свяжитесь с нами.",
+        ),
+        "contact":    ("Aloqa",                  "Контакты"),
+        "footer":     ("Uhud Auto",              "Uhud Auto"),
+    }
+
+    def t(key: str) -> str:
+        v = L.get(key, (key, key))
+        return v[0] if is_uz else v[1]
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=15 * mm,
+        rightMargin=15 * mm,
+        topMargin=15 * mm,
+        bottomMargin=15 * mm,
+    )
+    styles = _styles()
+    fn, fnb = _pdf_unicode_font_names()
+    story = []
+
+    # ── Header: logo + Uhud Auto + sarlavha ──────────────────────────────
+    logo_col_w = 46 * mm
+    text_col_w = max(50 * mm, doc.width - logo_col_w)
+
+    if os.path.exists(LOGO_PATH):
+        logo_cell = Table(
+            [[Image(LOGO_PATH, width=24 * mm, height=24 * mm)]],
+            colWidths=[logo_col_w - 4 * mm],
+            rowHeights=[28 * mm],
+            style=TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]),
+        )
+    else:
+        logo_cell = Paragraph("", styles["normal"])
+
+    header_right_stack = Table(
+        [
+            [Paragraph(_esc("Uhud Auto"), styles["company"])],
+            [Paragraph(_esc(t("title")), styles["order_num"])],
+            [Paragraph(_esc(f"{t('as_of')}: {date_label}"), styles["status"])],
+        ],
+        colWidths=[text_col_w],
+        style=TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]),
+    )
+    story.append(Table(
+        [[logo_cell, header_right_stack]],
+        colWidths=[logo_col_w, text_col_w],
+        style=TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]),
+    ))
+    story.append(Table(
+        [[""]],
+        colWidths=[doc.width],
+        rowHeights=[1],
+        style=TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), BRAND_BLUE),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.5, BRAND_BLUE),
+        ]),
+    ))
+    story.append(Spacer(1, 4 * mm))
+
+    # ── Mijoz ────────────────────────────────────────────────────────────
+    story.append(Paragraph(t("customer"), styles["section_title"]))
+    story.append(Table(
+        [
+            [Paragraph(f"{t('name')}:", styles["meta"]),
+             Paragraph(f"<b>{_esc(customer_name or '—')}</b>", styles["meta_bold"])],
+            [Paragraph(f"{t('phone')}:", styles["meta"]),
+             Paragraph(_esc(customer_phone or "—"), styles["meta"])],
+        ],
+        colWidths=[25 * mm, None],
+        style=TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), GREY_BG),
+            ("ROUNDEDCORNERS", [4]),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ]),
+    ))
+    story.append(Spacer(1, 5 * mm))
+
+    # ── Qarz summasi (asosiy blok) ───────────────────────────────────────
+    story.append(Paragraph(t("debt_box"), styles["section_title"]))
+    story.append(Table(
+        [[
+            Paragraph(f"<b>{t('debt_sum')}:</b>", ParagraphStyle(
+                "debt_lbl", parent=styles["meta_bold"], fontSize=11, leading=15,
+            )),
+            Paragraph(f"<b>{_esc(_fmt_usd(debt_amount))}</b>", ParagraphStyle(
+                "debt_val", parent=styles["bold_cell"], fontSize=15, leading=19,
+                alignment=TA_RIGHT, textColor=BRAND_BLUE,
+            )),
+        ]],
+        colWidths=[doc.width - 60 * mm, 60 * mm],
+        style=TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), BRAND_LIGHT),
+            ("BOX", (0, 0), (-1, -1), 0.75, BRAND_BLUE),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 10),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ]),
+    ))
+    story.append(Spacer(1, 6 * mm))
+
+    # ── So'nggi otgruzkalar jadvali ──────────────────────────────────────
+    story.append(Paragraph(
+        f"{t('docs_h')} ({t('period')}: {period_from} — {period_to})",
+        styles["section_title"],
+    ))
+
+    def _hdr_cell(text: str):
+        return Paragraph(f"<b>{_esc(text)}</b>", ParagraphStyle(
+            "debt_hdr", parent=styles["normal"], textColor=colors.white,
+            fontName=fnb, fontSize=9,
+        ))
+
+    col_n = 10 * mm
+    col_date = 26 * mm
+    col_total = 32 * mm
+    col_doc = doc.width - col_n - col_date - col_total
+
+    head = [[
+        _hdr_cell(t("col_n")),
+        _hdr_cell(t("col_date")),
+        _hdr_cell(t("col_doc")),
+        _hdr_cell(f"{t('col_total')}, USD"),
+    ]]
+    body = []
+    docs_total = 0.0
+    for idx, s in enumerate(shipments, 1):
+        moment = str(s.get("moment") or "")[:10]
+        try:
+            y, m, d = moment.split("-")
+            date_disp = f"{d}.{m}.{y}"
+        except ValueError:
+            date_disp = moment
+        amount = float(s.get("total_usd") or 0)
+        docs_total += amount
+        body.append([
+            Paragraph(str(idx), styles["normal"]),
+            Paragraph(_esc(date_disp), styles["normal"]),
+            Paragraph(_esc(f"№ {s.get('shipment_number') or '—'}"), styles["normal"]),
+            Paragraph(_esc(_fmt_money(amount)), styles["right_cell"]),
+        ])
+    if not body:
+        body.append([
+            Paragraph(_esc(t("no_docs")), styles["normal"]),
+            Paragraph("", styles["normal"]),
+            Paragraph("", styles["normal"]),
+            Paragraph("", styles["normal"]),
+        ])
+
+    story.append(Table(
+        head + body,
+        colWidths=[col_n, col_date, col_doc, col_total],
+        repeatRows=1,
+        style=TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), BRAND_BLUE),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, GREY_BG]),
+            ("FONTNAME", (0, 0), (-1, -1), fn),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.25, GREY_LINE),
+        ]),
+    ))
+
+    if shipments:
+        story.append(Table(
+            [[
+                Paragraph(f"<b>{_esc(t('docs_total'))}:</b>", styles["meta_bold"]),
+                Paragraph(
+                    f"<b>{_esc(_fmt_usd(docs_total))}</b>",
+                    ParagraphStyle("dt", parent=styles["bold_cell"],
+                                   textColor=BRAND_BLUE, alignment=TA_RIGHT),
+                ),
+            ]],
+            colWidths=[doc.width - 50 * mm, 50 * mm],
+            style=TableStyle([
+                ("ALIGN", (0, 0), (0, 0), "RIGHT"),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ]),
+        ))
+    story.append(Spacer(1, 6 * mm))
+
+    # ── Izoh + aloqa ─────────────────────────────────────────────────────
+    story.append(Table(
+        [[Paragraph(_esc(t("note")), styles["meta"])]],
+        colWidths=[doc.width],
+        style=TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), GREY_BG),
+            ("ROUNDEDCORNERS", [4]),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ]),
+    ))
+    if company_phone:
+        story.append(Spacer(1, 3 * mm))
+        story.append(Paragraph(
+            f"<b>{_esc(t('contact'))}:</b> {_esc(company_phone)}",
+            styles["meta_bold"],
+        ))
+
+    # ── Footer ───────────────────────────────────────────────────────────
+    story.append(Spacer(1, 6 * mm))
+    story.append(Paragraph(
+        f"{t('footer')} • {local_now().strftime('%d.%m.%Y %H:%M')}",
+        styles["footer"],
+    ))
+
+    doc.build(story)
+    return buffer.getvalue()
+
+
 def generate_period_report_pdf(
     *,
     lang: str,

@@ -340,6 +340,30 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
     },
 
+    # ── Qarzdorlik eslatmasi (Chorshanba / Yakshanba) ──────────────────────
+    "debt_reminder": {
+        "uz": (
+            "🔔 <b>Qarzdorlikni to'lash haqida eslatma</b>\n\n"
+            "🗓 <b>Sana:</b> {date}\n"
+            "🙍 <b>Mijoz:</b> {name}\n\n"
+            "💳 <b>Qarzdorlik summasi:</b> <b>{debt} USD</b>\n"
+            "📦 <b>So'nggi {days} kun otgruzkalari:</b> {ship_count} ta — {ship_total} USD\n\n"
+            "Iltimos, qarzdorlikni imkon qadar tezroq to'lab qo'yishingizni so'raymiz.\n"
+            "To'liq ma'lumot ilova qilingan PDF faylda 👇\n\n"
+            "☎️ Savollar bo'lsa: {company_phone}"
+        ),
+        "ru": (
+            "🔔 <b>Напоминание об оплате задолженности</b>\n\n"
+            "🗓 <b>Дата:</b> {date}\n"
+            "🙍 <b>Клиент:</b> {name}\n\n"
+            "💳 <b>Сумма задолженности:</b> <b>{debt} USD</b>\n"
+            "📦 <b>Отгрузки за последние {days} дн.:</b> {ship_count} шт — {ship_total} USD\n\n"
+            "Просим погасить задолженность в ближайшее время.\n"
+            "Подробная информация — в приложенном PDF 👇\n\n"
+            "☎️ Вопросы: {company_phone}"
+        ),
+    },
+
     "return_notification": {
         "uz": (
             "🔄 <b>Qaytarish amalga oshirildi!</b>\n\n"
