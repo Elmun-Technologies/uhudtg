@@ -15,6 +15,7 @@ async def init_db() -> None:
                 moysklad_counterparty_id TEXT,
                 balance_usd              REAL DEFAULT 0.0,
                 balance_updated_at       TIMESTAMP,
+                debt_notified_date       TEXT,
                 registered_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -95,6 +96,7 @@ async def init_db() -> None:
             "ALTER TABLE users ADD COLUMN moysklad_counterparty_id TEXT",
             "ALTER TABLE users ADD COLUMN balance_usd REAL DEFAULT 0.0",
             "ALTER TABLE users ADD COLUMN balance_updated_at TIMESTAMP",
+            "ALTER TABLE users ADD COLUMN debt_notified_date TEXT",
             "ALTER TABLE shipments ADD COLUMN seller_name TEXT",
         ]:
             try:
@@ -224,6 +226,21 @@ async def count_users_registered_between(utc_from: str, utc_to: str) -> int:
         ) as cur:
             row = await cur.fetchone()
             return int(row[0]) if row else 0
+
+
+async def mark_debt_notified(telegram_id: int, date_iso: str) -> None:
+    """Qarzdorlik eslatmasi yuborilgan kunni belgilash (mahalliy sana, YYYY-MM-DD).
+
+    Bir kun ichida takroriy yuborishni oldini oladi: uzilib qolgan ishga
+    tushirishni qaytadan boshlash mumkin va xabar olganlar ikkinchi marta
+    olmaydi.
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE users SET debt_notified_date = ? WHERE telegram_id = ?",
+            (date_iso, telegram_id),
+        )
+        await db.commit()
 
 
 async def get_all_users() -> list[dict]:

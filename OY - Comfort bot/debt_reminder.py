@@ -50,18 +50,34 @@ def debt_from_balance(balance: float) -> float:
     return round(-value, 2) if value < 0 else 0.0
 
 
-async def run_for_today(bot) -> None:
-    """Barcha qarzdor mijozlarga eslatma yuborish."""
+async def run_for_today(bot, *, force: bool = False) -> None:
+    """Barcha qarzdor mijozlarga eslatma yuborish.
+
+    force=True — bugun allaqachon eslatma olganlarga ham qaytadan yuborish.
+    """
     users = await db.get_all_users()
-    active = [
+    today = local_today()
+    today_iso = today.isoformat()
+    linked = [
         u for u in users
         if u.get("moysklad_counterparty_id") and u.get("telegram_id")
     ]
+    if force:
+        active = linked
+    else:
+        # Uzilib qolgan ishga tushirishni davom ettirish xavfsiz bo'lishi uchun
+        # bugun eslatma olganlar chetlab o'tiladi.
+        active = [u for u in linked if (u.get("debt_notified_date") or "") != today_iso]
+        already = len(linked) - len(active)
+        if already:
+            logger.info(
+                "debt_reminder: %d customer(s) already notified today, skipping",
+                already,
+            )
     if not active:
-        logger.info("debt_reminder: no customers with counterparty to notify")
+        logger.info("debt_reminder: no customers to notify")
         return
 
-    today = local_today()
     date_str = today.strftime("%d.%m.%Y")
     period_from_date = today - timedelta(days=DEBT_HISTORY_DAYS - 1)
     moment_lo = f"{period_from_date.isoformat()} 00:00:00"
@@ -131,6 +147,13 @@ async def run_for_today(bot) -> None:
                 logger.error("debt_reminder: send text to user %s failed: %s", tg_id, e)
                 stats["errored"] += 1
                 return
+
+            # Xabar ketdi — PDF muvaffaqiyatidan qat'i nazar belgilaymiz, aks holda
+            # qayta ishga tushirishda mijoz matnni ikkinchi marta olardi.
+            try:
+                await db.mark_debt_notified(tg_id, today_iso)
+            except Exception as e:
+                logger.warning("debt_reminder: mark_debt_notified %s: %s", tg_id, e)
 
             try:
                 pdf_bytes = await asyncio.to_thread(
