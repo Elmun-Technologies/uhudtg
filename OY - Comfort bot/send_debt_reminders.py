@@ -6,8 +6,13 @@ Ikki rejim:
   #    DEBT_BALANCE_SIGN to'g'ri sozlanganini shu yerda tekshiring.
   docker compose exec bot python send_debt_reminders.py
 
-  # 2) HAQIQIY YUBORISH — barcha qarzdor mijozlarga xabar + PDF ketadi.
+  # 2) HAQIQIY YUBORISH — bugun hali eslatma olmagan qarzdorlarga xabar + PDF.
+  #    Uzilib qolsa, shu buyruqni qaytadan berish xavfsiz: xabar olganlar
+  #    ikkinchi marta olmaydi.
   docker compose exec bot python send_debt_reminders.py --send
+
+  # 3) Bugun olganlarga ham QAYTA yuborish (ehtiyot bo'ling — takroriy xabar).
+  docker compose exec bot python send_debt_reminders.py --send --force
 """
 from __future__ import annotations
 
@@ -29,6 +34,7 @@ async def dry_run() -> None:
     from config import DEBT_BALANCE_SIGN, DEBT_MIN_AMOUNT
     from debt_reminder import debt_from_balance
     from formatting import fmt_usd
+    from time_utils import local_today
 
     await db.init_db()
     users = await db.get_all_users()
@@ -36,11 +42,12 @@ async def dry_run() -> None:
         u for u in users
         if u.get("moysklad_counterparty_id") and u.get("telegram_id")
     ]
+    today_iso = local_today().isoformat()
     print(f"\nDEBT_BALANCE_SIGN={DEBT_BALANCE_SIGN}  DEBT_MIN_AMOUNT={DEBT_MIN_AMOUNT}")
     print(f"Kontragenti bor mijozlar: {len(active)}\n")
 
     sem = asyncio.Semaphore(4)
-    rows: list[tuple[str, str, float, float]] = []
+    rows: list[tuple[str, str, float, float, bool]] = []
 
     async def check(user: dict) -> None:
         async with sem:
@@ -56,25 +63,33 @@ async def dry_run() -> None:
                 (user.get("name") or "").strip() or "—",
                 float(balance),
                 debt_from_balance(balance),
+                (user.get("debt_notified_date") or "") == today_iso,
             ))
 
     await asyncio.gather(*(check(u) for u in active), return_exceptions=True)
 
     debtors = [r for r in rows if r[3] >= DEBT_MIN_AMOUNT]
     debtors.sort(key=lambda r: r[3], reverse=True)
+    sent_today = [r for r in debtors if r[4]]
 
     print(f"{'tg_id':<13}{'balans':>14}{'qarz':>14}  ism")
-    for tg_id, name, balance, debt in debtors:
-        print(f"{tg_id:<13}{fmt_usd(balance):>14}{fmt_usd(debt):>14}  {name}")
+    for tg_id, name, balance, debt, notified in debtors:
+        mark = "  [bugun yuborilgan]" if notified else ""
+        print(f"{tg_id:<13}{fmt_usd(balance):>14}{fmt_usd(debt):>14}  {name}{mark}")
     print(
         f"\nQarzdorlar: {len(debtors)} / {len(rows)}   "
         f"Jami qarz: {fmt_usd(sum(r[3] for r in debtors))} USD"
     )
+    if sent_today:
+        print(
+            f"Bugun eslatma olgan: {len(sent_today)} — `--send` ularni chetlab o'tadi, "
+            f"yuboriladi: {len(debtors) - len(sent_today)}"
+        )
     print("\nHaqiqiy yuborish uchun:  python send_debt_reminders.py --send\n")
     await ms.close_moysklad_http()
 
 
-async def send_now() -> None:
+async def send_now(force: bool = False) -> None:
     from aiogram import Bot
     from aiogram.client.default import DefaultBotProperties
     from aiogram.enums import ParseMode
@@ -87,7 +102,7 @@ async def send_now() -> None:
     await db.init_db()
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     try:
-        await debt_reminder.run_for_today(bot)
+        await debt_reminder.run_for_today(bot, force=force)
     finally:
         await ms.close_moysklad_http()
         await bot.session.close()
@@ -95,6 +110,6 @@ async def send_now() -> None:
 
 if __name__ == "__main__":
     if "--send" in sys.argv:
-        asyncio.run(send_now())
+        asyncio.run(send_now(force="--force" in sys.argv))
     else:
         asyncio.run(dry_run())

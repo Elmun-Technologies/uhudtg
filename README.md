@@ -294,3 +294,28 @@ Rejalashtiruvchini kutmasdan darhol yuborish:
 ```bash
 docker compose exec bot python send_debt_reminders.py --send
 ```
+
+### Takrorlanishdan himoya
+
+Eslatma yuborilgan mijozga bazada bugungi sana belgilanadi (`users.debt_notified_date`),
+shuning uchun bir kun ichida ikkinchi marta yuborilmaydi. Ishga tushirish yarmida
+uzilib qolsa (masalan aloqa uzildi), yuqoridagi buyruqni **qaytadan berish
+xavfsiz** — faqat qolganlar xabar oladi. Dry-run ro'yxatida kim chetlab
+o'tilishi `[bugun yuborilgan]` deb ko'rsatiladi.
+
+Ataylab qayta yuborish kerak bo'lsa (takroriy xabar ketadi):
+
+```bash
+docker compose exec bot python send_debt_reminders.py --send --force
+```
+
+### Uzoq davom etadigan yuborishni fonda ishga tushirish
+
+`docker compose exec` terminalga bog'langan: SSH yoki brauzer sessiyasi uzilsa
+protsess ham to'xtaydi. Ko'p mijoz bo'lganda fonda ishga tushirib, chiqishni
+doimiy volume dagi faylga yozish qulay:
+
+```bash
+docker compose exec -d bot sh -c 'python send_debt_reminders.py --send > /data/debt_send.log 2>&1'
+docker compose exec bot tail -f /data/debt_send.log
+```
