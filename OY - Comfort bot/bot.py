@@ -47,6 +47,7 @@ async def main() -> None:
     logger.info("Webhook server listening on port %s", WEBHOOK_PORT)
 
     daily_report_task = asyncio.create_task(scheduler.run_daily_report_loop(bot))
+    debt_reminder_task = asyncio.create_task(scheduler.run_debt_reminder_loop(bot))
 
     logger.info("Starting bot polling…")
     try:
@@ -56,11 +57,12 @@ async def main() -> None:
             allowed_updates=["message", "callback_query"],
         )
     finally:
-        daily_report_task.cancel()
-        try:
-            await daily_report_task
-        except (asyncio.CancelledError, Exception):
-            pass
+        for task in (daily_report_task, debt_reminder_task):
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
         await moysklad.close_moysklad_http()
         await runner.cleanup()
         await bot.session.close()

@@ -14,6 +14,7 @@ Mijozlar uchun Telegram bot. MoySklad ERP tizimi bilan to'liq integratsiya qilin
 | 🛒 Buyurtmalar | So'nggi otgruzkalar ro'yxati |
 | 📊 Hisobot | Davr bo'yicha PDF hisobot (kunlik / haftalik / oylik va boshqalar) |
 | 🔔 Bildirishnomalar | Buyurtma, otgruzka, qaytarish, to'lov — avtomatik xabar |
+| 💳 Qarzdorlik eslatmasi | Har Chorshanba va Yakshanba qarzdorlarga qarz summasi + PDF avtomatik yuboriladi |
 | 🌐 Til | O'zbek / Rus tili |
 
 ---
@@ -171,8 +172,9 @@ uhudtg/
 │   ├── database.py             ← SQLite: foydalanuvchilar, buyurtmalar
 │   ├── moysklad_api.py         ← MoySklad API client
 │   ├── webhook_server.py       ← MoySklad webhook qabul qiluvchi
-│   ├── scheduler.py            ← Kunlik hisobot rejalashtiruvchi
+│   ├── scheduler.py            ← Kunlik hisobot + qarzdorlik eslatmasi rejalashtiruvchisi
 │   ├── daily_report.py         ← Admin hisobot generatori
+│   ├── debt_reminder.py        ← Qarzdorlik eslatmasi (Chorshanba / Yakshanba)
 │   ├── pdf_generator.py        ← PDF hisobot generatori
 │   ├── locales.py              ← Matnlar (uz / ru)
 │   ├── keyboards.py            ← Telegram tugmalar
@@ -188,6 +190,7 @@ uhudtg/
 │   ├── restore_users.py        ← MoySklad dan foydalanuvchilarni tiklash
 │   ├── sync_users.py           ← Foydalanuvchilarni sinxronlash
 │   ├── sync_balances.py        ← Barcha foydalanuvchilar balansini yangilash
+│   ├── send_debt_reminders.py  ← Qarzdorlik eslatmasini qo'lda tekshirish/yuborish
 │   ├── assets/
 │   │   └── logo.png            ← PDF uchun logotip (qo'lda qo'shiladi)
 │   ├── .env                    ← Tokenlar (git ga commit qilinmaydi!)
@@ -246,4 +249,48 @@ MoySklad → Telegram (webhook orqali)
 | `list_attributes.py` | Kontragent maxsus atributlarini va UUID larini ko'rish |
 | `restore_users.py` | MoySklad dan foydalanuvchilar jadvalini tiklash |
 | `sync_balances.py` | Barcha foydalanuvchilar balansini yangilash |
+| `send_debt_reminders.py` | Qarzdorlar ro'yxatini ko'rish (`--send` bilan — darhol yuborish) |
 | `healthcheck.py` | Bot holat tekshiruvi |
+
+---
+
+## Qarzdorlik eslatmasi
+
+Har hafta **Chorshanba** va **Yakshanba** kuni soat **10:00** (Toshkent vaqti)
+bot barcha mijozlarning MoySklad dagi joriy balansini tekshiradi va qarzi
+bo'lganlarga eslatma yuboradi:
+
+1. **Telegram xabari** — qarz summasi, so'nggi 90 kundagi otgruzkalar soni va
+   summasi, kompaniya telefoni (mijozning o'z tilida: uz / ru).
+2. **PDF fayl** — mijoz ma'lumotlari, to'lanishi kerak bo'lgan summa va
+   so'nggi otgruzkalar jadvali (sana, hujjat raqami, summa).
+
+Qarzi yo'q mijozlar hech qanday xabar olmaydi.
+
+### Sozlash
+
+Barcha parametrlar `.env` orqali o'zgartiriladi (`.env.example` ga qarang):
+
+| O'zgaruvchi | Default | Vazifasi |
+|---|---|---|
+| `DEBT_REMINDER_ENABLED` | `1` | `0` — funksiyani butunlay o'chirish |
+| `DEBT_REMINDER_WEEKDAYS` | `2,6` | Hafta kunlari (Dushanba=0 … Yakshanba=6) |
+| `DEBT_REMINDER_HOUR` / `_MINUTE` | `10` / `0` | Yuborish vaqti (Toshkent) |
+| `DEBT_BALANCE_SIGN` | `negative` | Balansda qarz qaysi ishora bilan (`negative` / `positive`) |
+| `DEBT_MIN_AMOUNT` | `1` | Shundan kichik qarzga eslatma yuborilmaydi (USD) |
+| `DEBT_HISTORY_DAYS` | `90` | PDF ga ilova qilinadigan otgruzka tarixi (kun) |
+
+### Tekshirish
+
+Hech kimga xabar yubormasdan qarzdorlar ro'yxatini ko'rish
+(`DEBT_BALANCE_SIGN` to'g'ri sozlanganini shu yerda tasdiqlang):
+
+```bash
+docker compose exec bot python send_debt_reminders.py
+```
+
+Rejalashtiruvchini kutmasdan darhol yuborish:
+
+```bash
+docker compose exec bot python send_debt_reminders.py --send
+```
