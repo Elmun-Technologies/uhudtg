@@ -439,4 +439,9 @@ def t(key: str, lang: str = "uz", **kwargs) -> str:
     """Get translated string. Falls back to 'uz' if lang not found."""
     variants = STRINGS.get(key, {})
     text = variants.get(lang) or variants.get("uz") or key
-    return text.format(**kwargs) if kwargs else text
+    text = text.format(**kwargs) if kwargs else text
+    if key.endswith("_notification"):
+        from config import COMPANY_PHONE
+        label = "☎️ Вопросы" if lang == "ru" else "☎️ Savollar bo'lsa"
+        text += f"\n\n{label}: {COMPANY_PHONE}"
+    return text
