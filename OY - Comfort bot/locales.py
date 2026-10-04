@@ -155,8 +155,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "uz": (
             "🛒 <b>Yangi buyurtma!</b> #{number}\n"
             "🗓 <b>{date}</b>\n"
-            "🙋‍♂️ <b>Yaratdi:</b> {created_by}\n"
-            "🧑‍💻 <b>Javobgar:</b> {responsible}\n"
             "🏠 <b>Ombor:</b> {warehouse}\n\n"
             "🙍 <b>Mijoz:</b> {name}\n"
             "📞 <b>Telefon:</b> {phone}\n\n"
@@ -168,8 +166,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": (
             "🛒 <b>Новый заказ!</b> #{number}\n"
             "🗓 <b>{date}</b>\n"
-            "🙋‍♂️ <b>Создал:</b> {created_by}\n"
-            "🧑‍💻 <b>Ответственный:</b> {responsible}\n"
             "🏠 <b>Склад:</b> {warehouse}\n\n"
             "🙍 <b>Клиент:</b> {name}\n"
             "📞 <b>Телефон:</b> {phone}\n\n"
@@ -183,8 +179,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "uz": (
             "🛒 <b>Yangi sotuv!</b> #{number}\n"
             "🗓 <b>{date}</b>\n"
-            "🙋‍♂️ <b>Yaratdi:</b> {created_by}\n"
-            "🧑‍💻 <b>Javobgar:</b> {responsible}\n"
             "🛍 <b>Sotuvchi:</b> {seller}\n"
             "🏠 <b>Ombor:</b> {warehouse}\n\n"
             "🙍 <b>Mijoz:</b> {name}\n"
@@ -197,8 +191,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": (
             "🛒 <b>Новая продажа!</b> #{number}\n"
             "🗓 <b>{date}</b>\n"
-            "🙋‍♂️ <b>Создал:</b> {created_by}\n"
-            "🧑‍💻 <b>Ответственный:</b> {responsible}\n"
             "🛍 <b>Продавец:</b> {seller}\n"
             "🏠 <b>Склад:</b> {warehouse}\n\n"
             "🙍 <b>Клиент:</b> {name}\n"
@@ -251,8 +243,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "uz": (
             "📦 <b>Yangi ta'minot (priyomka)!</b> #{number}\n"
             "🗓 <b>{date}</b>\n"
-            "🙋‍♂️ <b>Yaratdi:</b> {created_by}\n"
-            "🧑‍💻 <b>Javobgar:</b> {responsible}\n"
             "🏠 <b>Ombor:</b> {warehouse}\n\n"
             "🙍 <b>Ta'minotchi:</b> {name}\n"
             "📞 <b>Telefon:</b> {phone}\n\n"
@@ -264,8 +254,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": (
             "📦 <b>Новая поставка (приёмка)!</b> #{number}\n"
             "🗓 <b>{date}</b>\n"
-            "🙋‍♂️ <b>Создал:</b> {created_by}\n"
-            "🧑‍💻 <b>Ответственный:</b> {responsible}\n"
             "🏠 <b>Склад:</b> {warehouse}\n\n"
             "🙍 <b>Поставщик:</b> {name}\n"
             "📞 <b>Телефон:</b> {phone}\n\n"
@@ -280,9 +268,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "uz": (
             "🔄 <b>Ta'minotchiga qaytarish!</b>\n\n"
             "<b>📋</b> #{number}\n"
-            "<b>🗓 Sana va vaqt:</b> {date}\n"
-            "<b>🙋‍♂️ Yaratdi:</b> {created_by}\n"
-            "<b>🧑‍💻 Javobgar:</b> {responsible}\n\n"
+            "<b>🗓 Sana va vaqt:</b> {date}\n\n"
             "<b>🙍 Ta'minotchi:</b> {name}\n"
             "<b>📞 Telefon:</b> {phone}\n\n"
             "<b>🏠 Ombor:</b> {warehouse}\n\n"
@@ -293,9 +279,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": (
             "🔄 <b>Возврат поставщику!</b>\n\n"
             "<b>📋</b> #{number}\n"
-            "<b>🗓 Дата и время:</b> {date}\n"
-            "<b>🙋‍♂️ Создал:</b> {created_by}\n"
-            "<b>🧑‍💻 Ответственный:</b> {responsible}\n\n"
+            "<b>🗓 Дата и время:</b> {date}\n\n"
             "<b>🙍 Поставщик:</b> {name}\n"
             "<b>📞 Телефон:</b> {phone}\n\n"
             "<b>🏠 Склад:</b> {warehouse}\n\n"
@@ -368,9 +352,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "uz": (
             "🔄 <b>Qaytarish amalga oshirildi!</b>\n\n"
             "<b>📋</b> #{number}\n"
-            "<b>🗓 Sana va vaqt:</b> {date}\n"
-            "<b>🙋‍♂️ Yaratdi:</b> {created_by}\n"
-            "<b>🧑‍💻 Javobgar:</b> {responsible}\n\n"
+            "<b>🗓 Sana va vaqt:</b> {date}\n\n"
             "<b>🙍 Mijoz:</b> {name}\n"
             "<b>📞 Telefon:</b> {phone}\n\n"
             "<b>🏠 Ombor:</b> {warehouse}\n\n"
@@ -381,9 +363,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "ru": (
             "🔄 <b>Возврат оформлен!</b>\n\n"
             "<b>📋</b> #{number}\n"
-            "<b>🗓 Дата и время:</b> {date}\n"
-            "<b>🙋‍♂️ Создал:</b> {created_by}\n"
-            "<b>🧑‍💻 Ответственный:</b> {responsible}\n\n"
+            "<b>🗓 Дата и время:</b> {date}\n\n"
             "<b>🙍 Клиент:</b> {name}\n"
             "<b>📞 Телефон:</b> {phone}\n\n"
             "<b>🏠 Склад:</b> {warehouse}\n\n"
@@ -439,4 +419,9 @@ def t(key: str, lang: str = "uz", **kwargs) -> str:
     """Get translated string. Falls back to 'uz' if lang not found."""
     variants = STRINGS.get(key, {})
     text = variants.get(lang) or variants.get("uz") or key
-    return text.format(**kwargs) if kwargs else text
+    text = text.format(**kwargs) if kwargs else text
+    if key.endswith("_notification"):
+        from config import COMPANY_PHONE
+        label = "☎️ Вопросы" if lang == "ru" else "☎️ Savollar bo'lsa"
+        text += f"\n\n{label}: {COMPANY_PHONE}"
+    return text
