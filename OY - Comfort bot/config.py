@@ -21,7 +21,7 @@ WEBHOOK_PATH: str = os.getenv("WEBHOOK_PATH", "/moysklad/webhook")
 WEBHOOK_PORT: int = int(os.getenv("WEBHOOK_PORT", "8080"))
 WEBHOOK_SECRET: str = os.getenv("WEBHOOK_SECRET", "secret")
 DB_PATH: str = os.getenv("DB_PATH", "comfort_bot.db")
-COMPANY_PHONE: str = os.getenv("COMPANY_PHONE", "+998958220000")
+COMPANY_PHONE: str = os.getenv("COMPANY_PHONE", "+998785555556")
 # IANA timezone (Asia/Tashkent = GMT+5, DST yo‘q)
 APP_TIMEZONE: str = os.getenv("APP_TIMEZONE", "Asia/Tashkent")
 # MoySklad har doim `moment` ni MSK (UTC+3) hisobida offset siz qaytaradi —
