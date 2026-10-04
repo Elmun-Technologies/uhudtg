@@ -62,7 +62,7 @@ WEBHOOK_PATH=/moysklad/webhook
 WEBHOOK_SECRET=<pastdagi tayyor qiymatni qo'ying>
 DB_PATH=/data/comfort_bot.db
 ADMIN_IDS=<Telegram ID ingiz>
-COMPANY_PHONE=+998958220000
+COMPANY_PHONE=+998785555556
 APP_TIMEZONE=Asia/Tashkent
 ```
 

@@ -79,7 +79,7 @@ Full list (defaults from `config.py` shown where they exist):
 | `WEBHOOK_HOST_PORT` | No | (unset) | Expose 8080 on host directly (skip if using Caddy) |
 | `DB_PATH` | **Yes** | `comfort_bot.db` | **Must be `/data/comfort_bot.db` in Docker** |
 | `ADMIN_IDS` | **Yes** | `[]` | Admin Telegram IDs (comma-separated) |
-| `COMPANY_PHONE` | No | `+998958220000` | Shown in bot |
+| `COMPANY_PHONE` | No | `+998785555556` | Shown in bot |
 | `APP_TIMEZONE` | No | `Asia/Tashkent` | Bot timezone |
 | `DAILY_REPORT_HOUR` / `_MINUTE` | No | `20` / `0` | Daily report time |
 | `MOYSKLAD_MOMENT_NAIVE_SOURCE_TZ` | No | `Europe/Moscow` | MS timestamp source TZ |
@@ -98,7 +98,7 @@ Full list (defaults from `config.py` shown where they exist):
 | **Webhook Host / DOMAIN** | Your DNS registrar / domain you own (`https://<domain>`) | ✅ Yes — you own the domain; just re-point the A record to the new server IP. |
 | **Webhook Secret** | Arbitrary random string you chose; lived **only** in the server `.env` | ❌ **No** — old value is gone with the server. Generate a new one (`openssl rand -hex 24`) and re-register webhooks. |
 | **Admin IDs** | Each admin's Telegram numeric ID (@userinfobot) | ✅ Yes — known to the operators. |
-| **Company Phone** | Business phone; default `+998958220000` | ✅ Yes — known. |
+| **Company Phone** | Business phone; default `+998785555556` | ✅ Yes — known. |
 | **Database Path** | Config value; `/data/comfort_bot.db` (Docker volume) | ✅ Path yes; the **data** inside is lost (see §5–6). |
 | **MOYSKLAD_TG_ATTR_UUID** | `python list_attributes.py` against your MoySklad account | ✅ Yes — regenerate after MoySklad token is set. ⚠️ Two different UUIDs appear in the repo (see §11). |
 | **Other secrets** | None. No payment keys, no third-party APIs beyond Telegram + MoySklad. | — |
